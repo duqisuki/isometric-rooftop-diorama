@@ -721,6 +721,9 @@
               a.target = this.pickWander(a);
               a.state = 'walk';
             }
+          } else if (!a.target) {
+            a.state = 'idle';
+            a.wait = 0.5 + Math.random();
           } else {
             const sp = a.jog ? a.walkSpeed * 2.1 : a.walkSpeed;
             const d = this.goTo(a, a.target.u, a.target.v, sp, dt, 4);
@@ -1621,7 +1624,7 @@
       px(hx + f * 2, hy + 2, L([40, 40, 46]));
       px(hx + f * 3, hy + 2, L([40, 40, 46]));
       if (a.flash > 0) {
-        buf.ditherGlow(hx + f * 4, hy + 2, 7, 5, [255, 255, 240], 0.8, true);
+        buf.smoothGlow(hx + f * 4, hy + 2, 7, 5, [255, 255, 240], 0.8, true);
         px(hx + f * 4, hy + 2, [255, 255, 255]);
       }
     }
@@ -1746,6 +1749,11 @@
       buf.line(x - 2, y - 3, x, y - 5, L([132, 94, 56]));
       buf.line(x, y - 5, x + 2, y - 3, L([132, 94, 56]));
       buf.setPx(x + 1, y - 3, L([214, 60, 60]));
+    } else if (p.type === 'pistol') {
+      buf.hline(x - 1, x + 2, y - 1, L([52, 56, 64]));
+      buf.setPx(x - 1, y, L([52, 56, 64]));
+      buf.setPx(x + 1, y - 2, L([128, 136, 150]));
+      buf.hline(x - 2, x + 3, y + 1, atmo.ink, 0.3);
     } else if (p.type === 'rifle') {
       buf.line(x - 4, y, x + 4, y - 2, L([46, 50, 44]));
       buf.line(x - 4, y + 1, x - 2, y + 1, L([96, 76, 52]));

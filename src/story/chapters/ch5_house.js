@@ -1,5 +1,5 @@
 /*
- * Chapter 5 — «Дом» (A boarded-up house, Day 30, 21:40)
+ * Chapter 5 — «Дом» (A house, the same night: Day 12, 23:30)
  *
  * Candles, boarded windows, three survivors. Kostya hid the bite from the roof.
  * Tonight he turns. Mina goes to check on him. A candle falls, the fire spreads
@@ -46,7 +46,7 @@
     { b: [26, 10.6, 28.4, 12.8], h: 1.8, col: [176, 140, 92] }, // crates
     { b: [32.6, 22.4, 33.6, 23.4], h: 1.4, col: [130, 96, 66] }, // nightstand
   ];
-  const CANDLES = [{ u: 6, v: 21, z: 1.0 }, { u: 8, v: 5, z: 1.6 }, { u: 33.1, v: 22.9, z: 1.4 }, { u: 27, v: 6, z: 0.1 }];
+  const CANDLES = [{ u: 6, v: 21, z: 1.0, out: true }, { u: 8, v: 5, z: 1.6, out: true }, { u: 33.1, v: 22.9, z: 1.4, out: true }, { u: 27, v: 6, z: 0.1, out: true }];
   const WINDOWS_IN = [
     { u: 1.2, v: 21.5, du: 1, dv: 0 },
     { u: 1.2, v: 5.5, du: 1, dv: 0 },
@@ -113,7 +113,12 @@
           return hash2(plank, i * 3) > 0.5 ? [150, 116, 80] : [130, 98, 66];
         }
       }
-      // back door frame on the east end of the north wall is not visible; family photo
+      // front door (west wall), boarded from the inside
+      if (face === 'W' && s > 10.6 && s < 12.8 && z < 6.2) {
+        if (z > 5.8 || s < 10.9 || s > 12.5) return [96, 70, 50];
+        return (z * 1.6) % 1 < 0.6 ? [128, 96, 64] : [20, 22, 34];
+      }
+      // family photo
       if (face === 'W' && s > 12 && s < 13.6 && z > 4.5 && z < 6) return z > 5.8 || z < 4.7 ? [100, 70, 50] : [196, 180, 150];
       return hash2(x * 5, y * 3) > 0.96 ? shiftRGB(c, -16, -16, -16) : c;
     };
@@ -164,13 +169,13 @@
       }
     });
     FURN.forEach((f) => {
-      out.push({
-        depth: f.b[2] + f.b[3] - 0.3,
+      Kit.chunks(f.b[0], f.b[1], f.b[2], f.b[3], 1.3).forEach((ch) => out.push({
+        depth: (ch[0] + ch[2]) / 2 + (ch[1] + ch[3]) / 2 + 0.2,
         draw: () => {
           const c = L(f.col);
-          Kit.box(buf, PROJ, f.b[0], f.b[1], 0, f.b[2], f.b[3], f.h, f.top ? L(f.top) : shiftRGB(c, 16, 16, 16), c, mulRGB(c, 0.78), atmo.ink);
+          Kit.box(buf, PROJ, ch[0], ch[1], 0, ch[2], ch[3], f.h, f.top ? L(f.top) : shiftRGB(c, 16, 16, 16), c, mulRGB(c, 0.78), null);
         },
-      });
+      }));
     });
     return out;
   }
@@ -180,9 +185,9 @@
     number: 5,
     title: 'Дом',
     place: 'Заколоченный дом',
-    day: 'ДЕНЬ 30',
+    day: 'ДЕНЬ 12',
     duration: 900,
-    retryAt: 9.2,
+    retryAt: 15.2,
 
     create(api) {
       let phase = 'calm'; // calm → turn → escape
@@ -191,7 +196,7 @@
       let windowT = 0;
 
       const S = Diorama.Stage.create(api, {
-        U, V, depth: DEPTH, origin: ORIGIN, startHours: 21 + 40 / 60, day: 'День 30',
+        U, V, depth: DEPTH, origin: ORIGIN, startHours: 23.5, day: 'День 12',
         env: { cloudCoverage: 0 },
         decayAt: (t) => clamp((t - 7) / 25, 0, 0.6),
         tint: [1.0, 0.82, 0.74],
@@ -206,13 +211,13 @@
         wanderPoints: [{ u: 8, v: 16 }, { u: 9, v: 6 }, { u: 21, v: 8 }, { u: 30, v: 8 }, { u: 30, v: 20 }, { u: 14, v: 21 }],
         nav: true,
         items,
-        playZoom: 2.6,
+        playZoom: 2.0,
         drawLights: (buf, atmo, t) => {
           CANDLES.forEach((c, i) => {
             if (c.out) return;
             const p = project(c.u, c.v, c.z);
             const fl = 0.85 + 0.15 * Math.sin(t * 13 + i * 2) * Math.sin(t * 5.1 + i);
-            buf.ditherGlow(p[0], p[1] - 1, 26 * fl, 15 * fl, [255, 176, 90], 0.55, true);
+            buf.smoothGlow(p[0], p[1] - 1, 26 * fl, 15 * fl, [255, 176, 90], 0.55, true);
             buf.setPx(Math.round(p[0]), Math.round(p[1]) - 2, [255, 230, 150]);
             buf.setPx(Math.round(p[0]), Math.round(p[1]) - 1, [240, 236, 220]);
           });
@@ -225,20 +230,40 @@
       const P = S.player;
 
       const hero = crowd.add({
-        role: 'hero', u: 11, v: 22.5, state: 'idle', stay: true, scriptLocked: true, protected: true, noTurn: true, armed: true, rifle: true, facing: 1,
+        role: 'hero', u: 0.9, v: 11.7, state: 'idle', stay: true, scriptLocked: true, protected: true, noTurn: true, armed: true, facing: 1,
         look: { skin: [234, 198, 168], hair: [46, 36, 30], hairStyle: 'short', shirt: [176, 50, 44], pants: [56, 70, 104], shoes: [38, 38, 46] },
       });
       const mina = crowd.add({
-        role: 'mina', u: 2.4, v: 21.6, state: 'idle', stay: true, scriptLocked: true, noTurn: false, facing: -1,
+        role: 'mina', u: 0.9, v: 12.2, state: 'idle', stay: true, scriptLocked: true, noTurn: false, facing: -1,
         look: { skin: [236, 204, 180], hair: [52, 40, 36], hairStyle: 'long', shirt: [214, 220, 206], pants: [70, 84, 116] },
       });
       const kostya = crowd.add({
-        role: 'kostya', u: 36, v: 24, state: 'sit', seated: true, seatZ: 1.2, facing: -1, stay: true, scriptLocked: true, noTurn: true,
+        role: 'kostya', u: 0.9, v: 11.2, state: 'idle', stay: true, scriptLocked: true, noTurn: true,
         look: { skin: [206, 178, 150], hair: [130, 86, 50], hairStyle: 'short', shirt: [70, 110, 140], pants: [60, 60, 70] },
       });
 
-      S.at(1.5, () => { kostya.emote = 'dots'; kostya.emoteT = 2; sfx.tone(180, 'sawtooth', 0.03, 0.4); });
-      S.at(3.5, () => {
+      // ── Same night: they come in from the street ───────────────
+      S.at(0.2, () => {
+        crowd.setScript(kostya, [
+          { type: 'emote', emote: 'dots', t: 1.6 },
+          { type: 'goto', u: 9, v: 13.5, speed: 3.6 },
+          { type: 'goto', u: 21, v: 19.3, speed: 3.6 },
+          { type: 'goto', u: 21, v: 21.3, speed: 3.6 },
+          { type: 'goto', u: 34, v: 21.3, speed: 3.4 },
+          { type: 'sit', u: 36, v: 24, facing: -1 },
+          { type: 'call', fn: (a) => { a.seatZ = 1.2; } },
+        ]);
+      });
+      S.at(0.6, () => crowd.setScript(hero, [{ type: 'goto', u: 8, v: 15, speed: 2.4 }, { type: 'goto', u: 11, v: 22.5, speed: 2.2 }]));
+      S.at(1.0, () => crowd.setScript(mina, [{ type: 'goto', u: 1.6, v: 11.7, speed: 2 }, { type: 'face', dir: -1 }]));
+      S.at(2.0, () => { sfx.thud(); api.shake(0.15); });
+      S.at(2.6, () => { sfx.thud(); api.shake(0.15); });
+      S.at(3.2, () => { sfx.thud(); api.shake(0.15); });
+      S.at(3.8, () => crowd.setScript(mina, [{ type: 'goto', u: 6, v: 20.2, speed: 2 }, { type: 'call', fn: () => { CANDLES[0].out = false; sfx.tone(1400, 'sine', 0.02, 0.2); } }, { type: 'goto', u: 2.4, v: 21.6, speed: 2 }, { type: 'face', dir: -1 }]));
+      S.at(5.2, () => { CANDLES[1].out = false; CANDLES[3].out = false; });
+      S.at(6.0, () => { CANDLES[2].out = false; });
+      S.at(7.5, () => { kostya.emote = 'dots'; kostya.emoteT = 2; sfx.tone(180, 'sawtooth', 0.03, 0.4); });
+      S.at(9.5, () => {
         crowd.setScript(mina, [
           { type: 'goto', u: 16, v: 19.2, speed: 1.4 },
           { type: 'goto', u: 21, v: 19.2, speed: 1.4 },
@@ -249,8 +274,9 @@
         ]);
       });
       // Kostya turns
-      S.at(6.6, () => {
+      S.at(12.6, () => {
         phase = 'turn';
+        kostya.script = null;
         kostya.seated = false;
         kostya.state = 'rise';
         kostya.st = 0.8;
@@ -260,7 +286,7 @@
         hero.emote = 'exclaim';
         hero.emoteT = 1.6;
       });
-      S.at(8.2, () => {
+      S.at(14.2, () => {
         crowd.panic = true;
         crowd.hunting = true;
         mina.script = null;
@@ -278,20 +304,20 @@
         fireT = 1.4;
         api.shake(0.6);
       });
-      S.at(9, () => {
+      S.at(15, () => {
         phase = 'escape';
-        S.control(hero, { armed: true, melee: true, hp: 3, speed: 3.7, gun: { mag: 20, ammo: 9, reserve: 0, rate: 0.14, dmg: 2, heavy: true } });
-        hero.rifle = true;
+        S.control(hero, { armed: true, melee: true, hp: 3, speed: 3.7, gun: { mag: 8, ammo: 5, reserve: 0 } });
+        S.title('GET OUT', 2.2);
         S.marker = { u: BACKDOOR.u - 1.2, v: BACKDOOR.v, z: 6 };
         windowT = 0.8;
       });
 
       function camera(t) {
-        if (t < 3.5) return { x: S.screenOf(hero)[0] - 10, y: S.screenOf(hero)[1] - 4, zoom: 2.2, speed: 1 };
-        if (t < 9) {
+        if (t < 9.5) return { x: S.screenOf(hero)[0] + 10, y: S.screenOf(hero)[1] - 4, zoom: 1.8, speed: 1.2 };
+        if (t < 15) {
           const m = S.screenOf(mina);
           const k = S.screenOf(kostya);
-          return { x: (m[0] + k[0]) / 2, y: (m[1] + k[1]) / 2, zoom: 2.6, speed: 1.4 };
+          return { x: (m[0] + k[0]) / 2, y: (m[1] + k[1]) / 2, zoom: 2.0, speed: 1.4 };
         }
         return null;
       }

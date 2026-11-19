@@ -37,7 +37,7 @@
     const env = (S.env = Object.assign({}, BASE_ENV, cfg.env || {}));
     const startHours = cfg.startHours;
     const mps = cfg.minutesPerSecond != null ? cfg.minutesPerSecond : 0.25;
-    S.hoursAt = (t) => startHours + (t * mps) / 60;
+    S.hoursAt = cfg.hoursAt || ((t) => startHours + (t * mps) / 60);
     const atmo0 = computeAtmosphere(startHours, env, 0);
     const weather = (S.weather = Weather.createWeather());
     const decals = (S.decals = new Kit.Decals(proj));
@@ -72,6 +72,7 @@
     S.at = (t, fn) => timeline.push({ t, fn, done: false });
     S.after = (sec, fn) => api.after(sec, fn);
     S.caption = (text, dur) => api.caption(text, dur);
+    S.title = (word, dur) => api.title(word, dur);
 
     // ── Player ────────────────────────────────────────────────────
     const P = (S.player = {
@@ -96,7 +97,7 @@
       if (!hero) return;
       api.hud({
         hp: Math.max(0, hero.hp), maxHp: P.maxHp, oneTouch: P.oneTouch,
-        armed: P.armed, ammo: P.gun.ammo, reserve: P.gun.reserve, reloading: P.gun.reloadT > 0,
+        armed: P.armed, ammo: P.gun.ammo, mag: P.gun.mag, reserve: P.gun.reserve, reloading: P.gun.reloadT > 0,
         stamina: P.stamina, kills: crowd.kills, goal: P.goal,
         timer: P.timer != null ? Math.max(0, P.timer) : null, timerLabel: P.timerLabel,
       });
@@ -124,7 +125,7 @@
       P.maxHp = P.oneTouch ? 1 : o.hp || 3;
       hero.hp = P.maxHp;
       hero.runSpeed = o.speed || 3.9;
-      if (o.gun) P.gun = Object.assign({ mag: 12, ammo: 12, reserve: 24, reloadT: 0, fireCD: 0, meleeCD: 0, rate: 0.2, dmg: 2 }, o.gun);
+      if (o.gun) P.gun = Object.assign({ mag: 8, ammo: 8, reserve: 16, reloadT: 0, fireCD: 0, meleeCD: 0, rate: 0.38, dmg: 1, spread: 0.07 }, o.gun);
       P.goal = o.goal || '';
       P.timer = o.timer != null ? o.timer : null;
       P.timerLabel = o.timerLabel || 'Продержись';
@@ -167,7 +168,7 @@
       P.armed = true;
       P.melee = true;
       if (P.hero) P.hero.armed = true;
-      P.gun = Object.assign({ mag: 12, ammo: 12, reserve: 24, reloadT: 0, fireCD: 0, meleeCD: 0, rate: 0.2, dmg: 2 }, gun || {});
+      P.gun = Object.assign({ mag: 8, ammo: 8, reserve: 16, reloadT: 0, fireCD: 0, meleeCD: 0, rate: 0.38, dmg: 1, spread: 0.07 }, gun || {});
       pushHud();
     };
     S.hintHtml = hintHtml;
@@ -210,7 +211,7 @@
         if (tmax < tmin) continue;
         if (!best || tmin < best.t) {
           const hy = oy + dy * tmin;
-          best = { z, t: tmin, hx: ox + dx * tmin, hy, head: hy < b[1] + 5 };
+          best = { z, t: tmin, hx: ox + dx * tmin, hy, head: hy < b[1] + 3.5 };
         }
       }
       return best;
@@ -299,7 +300,10 @@
       }
       g.ammo--;
       g.fireCD = g.rate || 0.2;
-      const r = fireFrom(P.hero, P.hero.aimSX, P.hero.aimSY, { dmg: g.dmg, heavy: g.heavy });
+      const sp = (Math.random() - 0.5) * (g.spread || 0);
+      const c = Math.cos(sp);
+      const sn = Math.sin(sp);
+      const r = fireFrom(P.hero, P.hero.aimSX * c - P.hero.aimSY * sn, P.hero.aimSX * sn + P.hero.aimSY * c, { dmg: g.dmg, heavy: g.heavy });
       if (r.hit) api.soundscape.playZombieHit();
       api.shake(r.killed ? 0.22 : 0.15);
       if (g.ammo === 0 && g.reserve > 0) api.after(0.25, reload);
@@ -309,7 +313,7 @@
       const g = P.gun;
       const hero = P.hero;
       if (g.meleeCD > 0) return;
-      g.meleeCD = 0.42;
+      g.meleeCD = 0.55;
       hero.meleeT = 0.25;
       sfx.whoosh();
       let hitAny = false;
@@ -322,7 +326,7 @@
         const d = Math.hypot(du, dv);
         if (d > 2.2 || d < 0.01) continue;
         if ((du * (hero.aimWU || 0) + dv * (hero.aimWV || 0)) / d < 0.05) continue;
-        crowd.damageZombie(z, 1, (du / d) * 6.5, (dv / d) * 6.5, 1.0);
+        crowd.damageZombie(z, 1, (du / d) * 5, (dv / d) * 5, 0.8);
         hitAny = true;
       }
       if (hitAny) {
@@ -668,7 +672,7 @@
       const hero = P.hero;
       if (hero && !hero.removed && !hero.hidden) lastHero = screenOf(hero);
       const hp = lastHero || [CANVAS_W / 2, CANVAS_H / 2];
-      const zoom = cfg.playZoom || 2.3;
+      const zoom = cfg.playZoom || 1.75;
       if (P.playing) {
         if (P.armed) {
           return { x: hp[0] + (P.cross[0] - hp[0]) * 0.22, y: hp[1] + (P.cross[1] - hp[1]) * 0.22, zoom, speed: 5 };
@@ -676,7 +680,7 @@
         const lead = 4;
         return { x: hp[0] + (hero.vu - hero.vv) * lead * 0.5, y: hp[1] + (hero.vu + hero.vv) * lead * 0.25, zoom, speed: 4 };
       }
-      return { x: hp[0], y: hp[1], zoom: P.deadT >= 0 ? 3.1 : zoom, speed: P.deadT >= 0 ? 1.2 : 2 };
+      return { x: hp[0], y: hp[1], zoom: P.deadT >= 0 ? zoom * 1.25 : zoom, speed: P.deadT >= 0 ? 1.2 : 2 };
     }
 
     // ── Render ────────────────────────────────────────────────────
@@ -713,7 +717,7 @@
         const f = flashes[i];
         const fx = Math.round(f.x);
         const fy = Math.round(f.y);
-        buf.ditherGlow(fx, fy, 14, 10, [255, 198, 92], 0.6, true);
+        buf.smoothGlow(fx, fy, 14, 10, [255, 198, 92], 0.6, true);
         buf.rect(fx - 1, fy - 1, 3, 3, [255, 250, 226]);
         buf.setPx(fx - 2, fy, [255, 206, 78]);
         buf.setPx(fx + 2, fy, [255, 206, 78]);

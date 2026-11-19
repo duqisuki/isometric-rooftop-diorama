@@ -45,7 +45,7 @@
   for (let u = 2.5; u < 20; u += 5) for (let v = 20.5; v < 28; v += 4) TABLES.push({ u0: u, v0: v, u1: u + 3, v1: v + 1.6 });
   const SHELVES = [];
   for (let u = 24.5; u < 40; u += 4) SHELVES.push({ u0: u, v0: 21, u1: u + 2.6, v1: 21.7 }, { u0: u, v0: 25.5, u1: u + 2.6, v1: 26.2 });
-  const LOCKERS = [{ u0: 9, v0: 11.1, u1: 20.5, v1: 11.8 }, { u0: 24.5, v0: 11.1, u1: 36.5, v1: 11.8 }, { u0: 13, v0: 18.2, u1: 32, v1: 18.9 }];
+  const LOCKERS = [{ u0: 9, v0: 12.2, u1: 20.5, v1: 12.9 }, { u0: 24.5, v0: 12.2, u1: 36.5, v1: 12.9 }, { u0: 13, v0: 17.1, u1: 32, v1: 17.8 }];
   const EXITS = [
     { id: 'W', u: 0.9, v: 15, du: -1, dv: 0, noSpawn: true },
     { id: 'S', u: 44, v: 15, du: 1, dv: 0, playerExit: true, halfWidth: 2.6, noSpawn: true },
@@ -187,38 +187,41 @@
       });
     });
     TABLES.forEach((d) => {
-      out.push({ depth: d.u1 + d.v1 - 0.3, draw: () => Kit.box(buf, PROJ, d.u0, d.v0, 1.2, d.u1, d.v1, 1.6, L([226, 226, 222]), L([180, 180, 178]), L([150, 150, 148]), atmo.ink) });
+      Kit.chunks(d.u0, d.v0, d.u1, d.v1, 1.3).forEach((c) => out.push({
+        depth: (c[0] + c[2]) / 2 + (c[1] + c[3]) / 2 + 0.2,
+        draw: () => Kit.box(buf, PROJ, c[0], c[1], 1.2, c[2], c[3], 1.6, L([226, 226, 222]), L([180, 180, 178]), L([150, 150, 148]), null),
+      }));
     });
     SHELVES.forEach((d, i) => {
-      out.push({
-        depth: d.u1 + d.v1 - 0.2,
+      Kit.chunks(d.u0, d.v0, d.u1, d.v1, 1.3).forEach((c, ci) => out.push({
+        depth: (c[0] + c[2]) / 2 + (c[1] + c[3]) / 2 + 0.2,
         draw: () => {
-          Kit.box(buf, PROJ, d.u0, d.v0, 0, d.u1, d.v1, 3.6, L([150, 110, 74]), L([128, 92, 62]), L([104, 76, 52]), atmo.ink);
+          Kit.box(buf, PROJ, c[0], c[1], 0, c[2], c[3], 3.6, L([150, 110, 74]), L([128, 92, 62]), L([104, 76, 52]), null);
           for (let k = 0; k < 3; k++) {
             const z = 0.6 + k * 1.1;
-            const a = project(d.u0 + 0.1, d.v1, z);
-            const b = project(d.u1 - 0.1, d.v1, z);
-            for (let x = Math.round(a[0]); x < Math.round(b[0]); x++) {
-              const c = [[180, 60, 56], [60, 100, 160], [210, 180, 80], [70, 130, 90]][(x + k + i) % 4];
-              const yy = Math.round(a[1] + ((b[1] - a[1]) * (x - a[0])) / Math.max(1, b[0] - a[0]));
-              buf.vline(x, yy - 2, yy - 1, L(c));
+            const pa = project(c[0] + 0.1, c[3], z);
+            const pb = project(c[2] - 0.1, c[3], z);
+            for (let x = Math.round(pa[0]); x < Math.round(pb[0]); x++) {
+              const col = [[180, 60, 56], [60, 100, 160], [210, 180, 80], [70, 130, 90]][(x + k + i + ci) % 4];
+              const yy = Math.round(pa[1] + ((pb[1] - pa[1]) * (x - pa[0])) / Math.max(1, pb[0] - pa[0]));
+              buf.vline(x, yy - 2, yy - 1, L(col));
             }
           }
         },
-      });
+      }));
     });
     LOCKERS.forEach((d) => {
-      out.push({
-        depth: d.u1 + d.v1 - 0.2,
+      Kit.chunks(d.u0, d.v0, d.u1, d.v1, 1.15).forEach((c) => out.push({
+        depth: (c[0] + c[2]) / 2 + (c[1] + c[3]) / 2 + 0.2,
         draw: () => {
-          Kit.box(buf, PROJ, d.u0, d.v0, 0, d.u1, d.v1, 3.8, L([96, 140, 160]), L([80, 124, 146]), L([62, 100, 120]), atmo.ink);
-          for (let u = d.u0 + 1.1; u < d.u1; u += 1.1) {
-            const a = project(u, d.v1, 0.2);
-            const b = project(u, d.v1, 3.6);
-            buf.line(a[0], a[1], b[0], b[1], L([52, 84, 100]));
-          }
+          Kit.box(buf, PROJ, c[0], c[1], 0, c[2], c[3], 3.8, L([96, 140, 160]), L([80, 124, 146]), L([62, 100, 120]), null);
+          const pa = project(c[2], c[3], 0.2);
+          const pb = project(c[2], c[3], 3.6);
+          buf.line(pa[0], pa[1], pb[0], pb[1], L([52, 84, 100]));
+          const vent = project((c[0] + c[2]) / 2, c[3], 3.1);
+          buf.hline(Math.round(vent[0]) - 1, Math.round(vent[0]) + 1, Math.round(vent[1]), L([60, 96, 116]));
         },
-      });
+      }));
     });
     // Teacher desks
     [[10.5, 2.4], [26, 2.4], [41.5, 2.4]].forEach((p) => {
@@ -259,8 +262,8 @@
         wanderPoints: wanderPoints(),
         nav: true,
         items,
-        playZoom: 2.5,
-        camera: (t) => (t < 2.5 ? { x: S.screenOf(hero)[0] + 30, y: S.screenOf(hero)[1], zoom: 2.4, speed: 2 } : null),
+        playZoom: 1.9,
+        camera: (t) => (t < 2.5 ? { x: S.screenOf(hero)[0] + 30, y: S.screenOf(hero)[1], zoom: 1.9, speed: 2 } : null),
         audioMix: () => ({ calm: 0, dread: 0.7, murmur: 0 }),
       });
       const crowd = S.crowd;
@@ -268,7 +271,7 @@
       crowd.hunting = true;
 
       const hero = crowd.add({
-        role: 'hero', u: 0.8, v: 15, state: 'walk', scriptLocked: true, protected: true, noTurn: true, rifle: true, armed: true,
+        role: 'hero', u: 0.8, v: 15, state: 'walk', scriptLocked: true, protected: true, noTurn: true, armed: true,
         look: { skin: [234, 198, 168], hair: [46, 36, 30], hairStyle: 'short', shirt: [204, 56, 48], pants: [56, 70, 104], shoes: [38, 38, 46] },
       });
       crowd.setScript(hero, [{ type: 'goto', u: 4.2, v: 15, speed: 2.4 }]);
@@ -286,8 +289,8 @@
       });
 
       S.at(2.5, () => {
-        S.control(hero, { armed: true, melee: true, hp: 3, speed: 3.9, gun: { mag: 20, ammo: 20, reserve: 40, rate: 0.14, dmg: 2, heavy: true } });
-        hero.rifle = true;
+        S.control(hero, { armed: true, melee: true, hp: 3, speed: 3.9, gun: { mag: 8, ammo: 8, reserve: 16 } });
+        S.title('UPSTAIRS', 2.2);
         const g = EXITS.find((e) => e.playerExit);
         S.marker = { u: g.u - 1, v: g.v, z: 7 };
         S.trickle = { every: [7, 10], max: 14, n: [1, 2], from: 10 };
