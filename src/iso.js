@@ -4,11 +4,11 @@
   const Diorama = (global.Diorama = global.Diorama || {});
   const { hash2, shiftRGB, lerpRGB, mulRGB, bayer4, clamp } = Diorama.Palette;
 
-  const CANVAS_W = 350;
-  const CANVAS_H = 264;
+  const CANVAS_W = 480;
+  const CANVAS_H = 270;
   const ISO_SCALE = 1.5;
-  const ORIGIN_X = 142;
-  const ORIGIN_Y = 148;
+  const ORIGIN_X = 207;
+  const ORIGIN_Y = 152;
 
   // Main building bounds in logical world iso units (projected at 1.5x exact 2:1 scale)
   const BUILDING = {

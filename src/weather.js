@@ -11,47 +11,47 @@
   } = Diorama.Palette;
   const { CANVAS_W, CANVAS_H, BUILDING, project } = Diorama.Iso;
 
-  // Sculptural multi-lobe cloud bank profile (tightly framed for crisp 350x264 close-up)
+  // Sculptural multi-lobe cloud bank profile (centered for 480x270 16:9 canvas)
   const CLOUD_PUFFS = [
-    { x: 48, y: 89, rx: 27, ry: 17, minCov: 0.55 },
-    { x: 90, y: 79, rx: 32, ry: 20, minCov: 0.25 },
-    { x: 134, y: 77, rx: 29, ry: 18, minCov: 0.45 },
-    { x: 178, y: 59, rx: 34, ry: 22, minCov: 0.05 },
-    { x: 226, y: 69, rx: 31, ry: 20, minCov: 0.30 },
-    { x: 272, y: 81, rx: 29, ry: 19, minCov: 0.50 },
-    { x: 310, y: 89, rx: 25, ry: 17, minCov: 0.72 },
+    { x: 112, y: 86, rx: 28, ry: 17, minCov: 0.55 },
+    { x: 155, y: 76, rx: 33, ry: 20, minCov: 0.25 },
+    { x: 199, y: 74, rx: 30, ry: 18, minCov: 0.45 },
+    { x: 243, y: 56, rx: 36, ry: 22, minCov: 0.05 },
+    { x: 291, y: 66, rx: 32, ry: 20, minCov: 0.30 },
+    { x: 337, y: 78, rx: 30, ry: 19, minCov: 0.50 },
+    { x: 375, y: 86, rx: 26, ry: 17, minCov: 0.72 },
     // Distinct secondary dome tufts for rich silhouette & underside valleys
-    { x: 114, y: 64, rx: 22, ry: 14, minCov: 0.65 },
-    { x: 206, y: 55, rx: 25, ry: 15, minCov: 0.60 },
-    { x: 256, y: 67, rx: 22, ry: 14, minCov: 0.75 },
-    { x: 294, y: 76, rx: 21, ry: 13, minCov: 0.80 },
+    { x: 179, y: 61, rx: 23, ry: 14, minCov: 0.65 },
+    { x: 271, y: 52, rx: 26, ry: 15, minCov: 0.60 },
+    { x: 321, y: 64, rx: 23, ry: 14, minCov: 0.75 },
+    { x: 359, y: 73, rx: 22, ry: 13, minCov: 0.80 },
   ];
 
   function createWeather() {
-    // 108 diagonal raindrop streaks across tightly framed canvas
-    const raindrops = Array.from({ length: 108 }, (_, i) => ({
-      x: 16 + ((i * 47.3) % 316),
-      y: 80 + ((i * 33.7) % 176),
+    // 116 diagonal raindrop streaks across 480x270 canvas
+    const raindrops = Array.from({ length: 116 }, (_, i) => ({
+      x: 56 + ((i * 51.3) % 368),
+      y: 78 + ((i * 33.7) % 184),
       len: 7 + (i % 4) * 2.2,
       speed: 170 + (i % 5) * 26,
       layer: i % 4 === 0 ? 0 : 1,
       roofDrop: i % 3 === 0,
     }));
 
-    // 108 snowflakes with depth & sinusoidal flutter
-    const snowflakes = Array.from({ length: 108 }, (_, i) => ({
-      x: 12 + ((i * 51.7) % 326),
-      y: 36 + ((i * 29.3) % 220),
+    // 116 snowflakes with depth & sinusoidal flutter
+    const snowflakes = Array.from({ length: 116 }, (_, i) => ({
+      x: 40 + ((i * 57.7) % 400),
+      y: 34 + ((i * 29.3) % 228),
       speed: 20 + (i % 5) * 6.5,
       phase: i * 1.37,
       size: i % 4 === 0 ? 2 : 1,
       layer: i % 3 === 0 ? 0 : 1,
     }));
 
-    // 64 fixed crisp pixel stars in the upper sky dome
-    const stars = Array.from({ length: 64 }, (_, i) => {
-      const x = Math.floor(10 + hash2(i, 13) * 330);
-      const y = Math.floor(8 + hash2(i, 71) * 116);
+    // 72 fixed crisp pixel stars in the upper sky dome
+    const stars = Array.from({ length: 72 }, (_, i) => {
+      const x = Math.floor(14 + hash2(i, 13) * 452);
+      const y = Math.floor(8 + hash2(i, 71) * 124);
       return {
         x,
         y,
@@ -224,7 +224,7 @@
       }
 
       // Crisp pixel crescent moon in upper-right sky
-      const mx = 298;
+      const mx = 376;
       const my = 34;
       buf.ditherGlow(mx, my, 24, 24, [186, 206, 252], starVis * 0.3, true);
       const mr = 10;
@@ -294,9 +294,13 @@
   /**
    * Renders the sculptural Bayer-ordered dithered cloud bank hovering above the rooftop.
    */
-  function drawDitheredClouds(buf, weather, state, atmo, hitList) {
+  function drawDitheredClouds(buf, weather, state, atmo, hitList, opts) {
     const cov = clamp(state.env.cloudCoverage, 0, 1);
     if (cov < 0.06) return;
+
+    const offsetY = (opts && opts.offsetY) || 0;
+    const dreadTint = clamp((opts && opts.dreadTint) || 0, 0, 1);
+    const maxCloudY = (opts && opts.maxY) || 130;
 
     const dark = state.env.cloudDarkness;
     const warm = clamp(state.env.cloudWarmth + atmo.warmth * 0.5, 0, 1);
@@ -310,6 +314,12 @@
       colDark = lerpRGB(colDark, [172, 112, 114], warm * 0.72);
       colMid = lerpRGB(colMid, [228, 156, 122], warm * 0.78);
       colLight = lerpRGB(colLight, [254, 218, 172], warm * 0.85);
+    }
+
+    if (dreadTint > 0.01) {
+      colDark = lerpRGB(colDark, [108, 72, 76], dreadTint * 0.85);
+      colMid = lerpRGB(colMid, [154, 102, 98], dreadTint * 0.85);
+      colLight = lerpRGB(colLight, [202, 148, 134], dreadTint * 0.8);
     }
 
     if (state.env.snowLevel > 0.3 && atmo.night < 0.6) {
@@ -342,7 +352,7 @@
       const rx = p.rx * (0.72 + 0.32 * vis);
       const ry = p.ry * (0.72 + 0.32 * vis);
       const px = p.x + swayX;
-      const py = p.y + swayY;
+      const py = p.y + swayY + offsetY;
       active.push({ x: px, y: py, rx, ry, vis });
       if (px - rx - 6 < minX) minX = px - rx - 6;
       if (px + rx + 6 > maxX) maxX = px + rx + 6;
@@ -350,10 +360,10 @@
       if (py + ry + 6 > maxY) maxY = py + ry + 6;
     }
 
-    const x0 = Math.max(4, Math.floor(minX));
-    const x1 = Math.min(CANVAS_W - 5, Math.ceil(maxX));
-    const y0 = Math.max(12, Math.floor(minY));
-    const y1 = Math.min(162, Math.ceil(maxY));
+    const x0 = Math.max(2, Math.floor(minX));
+    const x1 = Math.min(CANVAS_W - 3, Math.ceil(maxX));
+    const y0 = Math.max(0, Math.floor(minY));
+    const y1 = Math.min(maxCloudY, Math.ceil(maxY));
 
     for (let y = y0; y <= y1; y++) {
       for (let x = x0; x <= x1; x++) {
