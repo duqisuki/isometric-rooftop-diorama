@@ -56,6 +56,7 @@
         hudTimer: document.getElementById('hud-timer'),
         hudStamina: document.getElementById('hud-stamina-fill'),
         caption: document.getElementById('story-caption'),
+        title: document.getElementById('story-title'),
         hint: document.getElementById('hud-hint'),
         chapterLabel: document.getElementById('story-chapter'),
         chapterSegs: document.getElementById('story-chapters'),
@@ -104,6 +105,7 @@
       this.finalEnd = false;
       this.timers = [];
       this.shakeAmt = 0;
+      if (this.el.title) this.el.title.classList.remove('visible');
       this.hideEnd();
       this.hideCard(true);
       this.hideCaption();
@@ -179,6 +181,19 @@
       if (this.el.caption) this.el.caption.classList.remove('visible');
     }
 
+    // One big word in the middle of the screen (e.g. SURVIVE) that fades away
+    showTitle(word, dur) {
+      const el = this.el.title;
+      if (!el) return;
+      el.textContent = word;
+      el.classList.remove('visible');
+      void el.offsetWidth;
+      el.classList.add('visible');
+      this.titleId = (this.titleId || 0) + 1;
+      const id = this.titleId;
+      this.after(dur || 2.2, () => { if (this.titleId === id) el.classList.remove('visible'); });
+    }
+
     skip() {
       if (this.index + 1 < CHAPTERS.length) this.start(this.index + 1, true);
       else if (!this.finished) {
@@ -228,26 +243,22 @@
         el.hudHearts.innerHTML = hearts;
         el.hudHearts.dataset.k = hearts;
       }
+      // Ammo: a row of rounds in the magazine + a small reserve count, no boxes
       el.hudAmmo.hidden = !h.armed;
       if (h.armed) {
-        const ammo = h.reloading ? 'перезарядка…' : `${h.ammo} / ${h.reserve}`;
-        if (el.hudAmmo.textContent !== ammo) el.hudAmmo.textContent = ammo;
-        el.hudAmmo.classList.toggle('low', !h.reloading && h.ammo <= 3);
-      }
-      el.hudKills.hidden = !h.armed;
-      const kills = `Убито: ${h.kills}`;
-      if (el.hudKills.textContent !== kills) el.hudKills.textContent = kills;
-      // No objective text on screen — the world (markers, the timer) tells you what to do
-      el.hudGoal.hidden = true;
-      if (el.hudTimer) {
-        el.hudTimer.hidden = h.timer == null;
-        if (h.timer != null) {
-          const s = Math.ceil(h.timer);
-          const txt = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-          if (el.hudTimer.textContent !== txt) el.hudTimer.textContent = txt;
-          el.hudTimer.classList.toggle('urgent', h.timer < 10);
+        let pips = '';
+        for (let i = 0; i < (h.mag || h.ammo); i++) pips += `<span class="pip${i < h.ammo ? '' : ' empty'}"></span>`;
+        pips += `<span class="reserve">${h.reserve > 0 ? '+' + h.reserve : ''}</span>`;
+        if (el.hudAmmo.dataset.k !== pips) {
+          el.hudAmmo.innerHTML = pips;
+          el.hudAmmo.dataset.k = pips;
         }
+        el.hudAmmo.classList.toggle('reloading', !!h.reloading);
       }
+      // No kill counter, no objective text, no timer — the world tells you what to do
+      el.hudKills.hidden = true;
+      el.hudGoal.hidden = true;
+      if (el.hudTimer) el.hudTimer.hidden = true;
       if (el.hudStamina) {
         el.hudStamina.style.width = Math.round((h.stamina != null ? h.stamina : 1) * 100) + '%';
         el.hudStamina.parentElement.classList.toggle('low', h.stamina < 0.3);
@@ -299,6 +310,7 @@
         next: () => this.next(),
         retry: () => this.restart(),
         caption: (text, dur) => this.showCaption(text, dur),
+        title: (word, dur) => this.showTitle(word, dur),
       };
     }
 
@@ -427,7 +439,7 @@
       const ch = this.chapter;
       if (!ch) return;
       const el = this.el;
-      const label = `Глава ${ch.number} · ${ch.title}`;
+      const label = `Глава ${ch.number} · ${ch.title}` + (ch.day ? ` · ${ch.day.toLowerCase()}` : '');
       if (el.chapterLabel && el.chapterLabel.textContent !== label) el.chapterLabel.textContent = label;
       const frac = clamp(this.t / ch.duration, 0, 1);
       if (el.progress) el.progress.style.width = (frac * 100).toFixed(2) + '%';

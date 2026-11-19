@@ -220,7 +220,7 @@
     place: 'Перекрёсток',
     day: 'ДЕНЬ 1',
     duration: 900,
-    retryAt: 15.2,
+    retryAt: 18.0,
 
     create(api) {
       let phase = 'stand'; // stand → pickup → fight
@@ -249,20 +249,47 @@
       const sfx = S.sfx;
       const P = S.player;
 
-      // Wrecked truck, smoking
-      const truck = S.addVehicle({ u: TRUCK.u, v: TRUCK.v, speed: 0, wreck: true, lightsOn: false, smash: false, doorOpen: 1 });
-      S.fire.add(TRUCK.u + 2.6, TRUCK.v - 0.3, 1.4, 0.6);
-      S.decals.add(TRUCK.u + 3, TRUCK.v, 1.6, { kind: 'splat' }); // glass + oil
-      // a lamp post bent by the crash
-      S.at(0, () => api.shake(0.3));
+      // The truck from the park comes tearing down the street — and doesn't make the turn
+      const T0 = 2.8;
+      let crashed = false;
+      sfx.engine(1);
+      const truck = S.addVehicle({
+        u: -7, v: TRUCK.v, speed: 12, targetSpeed: 12, lightsOn: true,
+        path: [{ u: TRUCK.u, v: TRUCK.v, fn: crash }],
+      });
+      function crash(veh) {
+        crashed = true;
+        veh.speed = 0;
+        veh.targetSpeed = 0;
+        veh.path = [];
+        veh.wreck = true;
+        veh.lightsOn = false;
+        veh.smash = false;
+        sfx.stopEngine();
+        sfx.crash();
+        api.shake(1.2);
+        S.fire.add(TRUCK.u + 2.6, TRUCK.v - 0.3, 1.4, 0.6);
+        S.particles.bloodBurst(TRUCK.u + 2.6, TRUCK.v, 2, 0, 0);
+        for (let k = 0; k < 14; k++) {
+          S.particles.spawn({ kind: 'shell', u: TRUCK.u + 2.6, v: TRUCK.v + (Math.random() - 0.5) * 2, z: 2.5, vu: 2 + Math.random() * 3, vv: (Math.random() - 0.5) * 4, vz: 4 + Math.random() * 4, gravity: 30, maxAge: 6, col: [220, 232, 240] });
+        }
+        S.after(0.9, () => {
+          veh.doorOpen = 1;
+          hero.hidden = false;
+          soldier.hidden = false;
+          soldier.noTarget = false;
+          hero.emote = 'double';
+          hero.emoteT = 1.2;
+        });
+      }
 
       const hero = crowd.add({
-        role: 'hero', u: TRUCK.u + 0.5, v: TRUCK.v + 2.1, state: 'idle', stay: true, scriptLocked: true, protected: true, noTurn: true, facing: -1,
+        role: 'hero', u: TRUCK.u + 0.5, v: TRUCK.v + 2.1, state: 'idle', stay: true, hidden: true, scriptLocked: true, protected: true, noTurn: true, facing: -1,
         look: { skin: [234, 198, 168], hair: [46, 36, 30], hairStyle: 'short', shirt: [204, 56, 48], pants: [56, 70, 104], shoes: [38, 38, 46] },
       });
       const soldier = crowd.add({
         role: 'soldier', u: TRUCK.u - 1.5, v: TRUCK.v + 2.0, state: 'idle', stay: true, scriptLocked: true, noTurn: true,
-        armed: true, rifle: true, reactMin: 99,
+        armed: true, rifle: true, reactMin: 99, hidden: true, noTarget: true,
         look: { skin: [214, 176, 140], hair: [40, 36, 30], hairStyle: 'cap', cap: [86, 98, 64], shirt: [96, 108, 72], pants: [84, 92, 64], shoes: [40, 40, 36] },
       });
       soldier.turnAt = -1;
@@ -270,14 +297,14 @@
       // The horde, closing in from all four streets
       const ring = [[8, 18], [12, 21], [50, 18], [55, 21], [29, 5], [31, 8], [30, 33], [28, 36]];
       ring.forEach((p) => S.spawnZombie(p[0], p[1], { chaseSpeed: 2.6 + Math.random() * 0.5 }));
-      S.at(2, () => S.wave('A', 3));
-      S.at(4, () => S.wave('C', 3));
-      S.at(6, () => S.wave('D', 3));
-      S.at(8.5, () => S.wave('A', 2));
-      S.at(10, () => S.wave('C', 3));
+      S.at(T0 + 2, () => S.wave('A', 3));
+      S.at(T0 + 4, () => S.wave('C', 3));
+      S.at(T0 + 6, () => S.wave('D', 3));
+      S.at(T0 + 8.5, () => S.wave('A', 2));
+      S.at(T0 + 10, () => S.wave('C', 3));
 
       // The end of the soldier is not optional
-      S.at(12.5, () => {
+      S.at(T0 + 12.5, () => {
         if (soldier.state === 'down' || soldier.state === 'grabbed') return;
         const z = crowd.actors
           .filter((a) => a.kind === 'zombie' && a.state !== 'down' && a.state !== 'flung')
@@ -290,7 +317,7 @@
 
       function giveControl() {
         phase = 'pickup';
-        rifleProp = crowd.addProp({ type: 'rifle', u: soldier.u + 1.1, v: soldier.v + 0.4 });
+        rifleProp = crowd.addProp({ type: 'pistol', u: soldier.u + 1.1, v: soldier.v + 0.4 });
         hero.v = Math.max(hero.v, TRUCK.v + 1.9);
         S.control(hero, { armed: false, melee: false, hp: 3, speed: 4.0 });
         S.marker = { u: rifleProp.u, v: rifleProp.v, z: 5, color: [255, 214, 90] };
@@ -298,10 +325,14 @@
       }
 
       function camera(t) {
+        if (!crashed) {
+          const p = S.screenOf({ u: truck.u + 1, v: truck.v });
+          return { x: p[0] + 20, y: p[1], zoom: 1.6, speed: 3 };
+        }
         if (phase === 'stand') {
           const a = S.screenOf(soldier);
           const b = S.screenOf(hero);
-          return { x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2 - 2, zoom: t < 1.5 ? 2.0 : 2.5, speed: 1.6 };
+          return { x: (a[0] + b[0]) / 2, y: (a[1] + b[1]) / 2 - 2, zoom: t < 1.5 ? 1.6 : 1.95, speed: 1.6 };
         }
         return null;
       }
@@ -313,7 +344,7 @@
           if (soldier.state === 'idle' || soldier.state === 'walk') {
             shotT -= dt;
             const targets = crowd.actors.filter((a) => a.kind === 'zombie' && a.revealed && a.state !== 'down' && a.state !== 'flung' && Diorama.Actors.dist(a, soldier) < 16);
-            if (targets.length && soldierAmmo > 0 && shotT <= 0 && t > 1.2) {
+            if (targets.length && soldierAmmo > 0 && shotT <= 0 && t > T0 + 1.0 && !soldier.hidden) {
               targets.sort((a, b) => Diorama.Actors.dist(a, soldier) - Diorama.Actors.dist(b, soldier));
               S.npcShoot(soldier, targets[0], { spread: 0.2, heavy: true, dmg: 2 });
               soldierAmmo--;
@@ -334,8 +365,8 @@
             const i = crowd.props.indexOf(rifleProp);
             if (i >= 0) crowd.props.splice(i, 1);
             rifleProp = null;
-            hero.rifle = true;
-            S.giveGun({ mag: 20, ammo: 20, reserve: 40, rate: 0.14, dmg: 2, heavy: true });
+            S.giveGun({ mag: 8, ammo: 8, reserve: 8 });
+            S.title('RUN', 2.2);
             api.soundscape.playReload();
             phase = 'fight';
             const g = EXITS.find((e) => e.playerExit);

@@ -13,6 +13,42 @@
   const { clamp, lerp, lerpRGB, mulRGB, shiftRGB, hash2, bayer4 } = Diorama.Palette;
   const S = Diorama.Iso.ISO_SCALE;
 
+  // Smooth radial light (story mode): no Bayer pattern, so it stays clean when the camera zooms in
+  Diorama.PixelBuffer.prototype.smoothGlow = function (cx, cy, rx, ry, rgb, strength, additive) {
+    const x0 = Math.max(0, Math.floor(cx - rx));
+    const x1 = Math.min(this.width - 1, Math.ceil(cx + rx));
+    const y0 = Math.max(0, Math.floor(cy - ry));
+    const y1 = Math.min(this.height - 1, Math.ceil(cy + ry));
+    const s = strength == null ? 0.6 : strength;
+    for (let y = y0; y <= y1; y++) {
+      const dy = (y + 0.5 - cy) / ry;
+      for (let x = x0; x <= x1; x++) {
+        const dx = (x + 0.5 - cx) / rx;
+        const d2 = dx * dx + dy * dy;
+        if (d2 >= 1) continue;
+        const f = 1 - d2;
+        const a = f * f * s * 0.6;
+        if (additive === false) this.blendPx(x, y, rgb, a);
+        else this.addPx(x, y, rgb, a);
+      }
+    }
+  };
+
+  // Split a long box into short chunks so people sort correctly against it
+  function chunks(u0, v0, u1, v1, maxLen) {
+    const m = maxLen || 1.4;
+    const alongU = u1 - u0 >= v1 - v0;
+    const len = alongU ? u1 - u0 : v1 - v0;
+    const n = Math.max(1, Math.ceil(len / m));
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const a = (len * i) / n;
+      const b = (len * (i + 1)) / n;
+      out.push(alongU ? [u0 + a, v0, u0 + b, v1] : [u0, v0 + a, u1, v0 + b]);
+    }
+    return out;
+  }
+
   function makeProjector(ox, oy) {
     function project(u, v, z) {
       z = z || 0;
@@ -286,15 +322,16 @@
           continue;
         }
         if (p.kind === 'smoke') {
+          // soft round puff (no dither checkerboard)
           const k = p.age / p.maxAge;
           const a = (k < 0.15 ? k / 0.15 : 1 - (k - 0.15) / 0.85) * (p.alpha || 0.4);
           const col = atmo.applyLight(p.col);
           const r = 1 + Math.floor(k * (p.size || 3));
           for (let yy = -r; yy <= r; yy++) {
             for (let xx = -r; xx <= r; xx++) {
-              if (xx * xx + yy * yy > r * r + 1) continue;
-              if (a < bayer4(x + xx, y + yy)) continue;
-              buf.blendPx(x + xx, y + yy, col, 0.75);
+              const d = (xx * xx + yy * yy) / (r * r + 1);
+              if (d > 1) continue;
+              buf.blendPx(x + xx, y + yy, col, a * 0.55 * (1 - d * 0.6));
             }
           }
           continue;
@@ -406,17 +443,24 @@
     skull: [60, 64, 74],
   };
 
+  // Crisp speech-bubble icon: solid pixels only (no half-transparent mush when zoomed)
   function drawEmote(buf, cx, cy, kind, alpha) {
     const spr = EMOTES[kind];
-    if (!spr) return;
+    if (!spr || alpha < 0.3) return;
     const bx = Math.round(cx) - 4;
     const by = Math.round(cy) - 8;
-    buf.rect(bx, by, 9, 7, [252, 252, 255], alpha * 0.94);
+    const ink = [44, 48, 60];
+    buf.hline(bx + 1, bx + 7, by - 1, ink);
+    buf.hline(bx + 1, bx + 7, by + 7, ink);
+    buf.vline(bx - 1 + 1, by, by + 6, ink);
+    buf.vline(bx + 8, by, by + 6, ink);
+    buf.rect(bx + 1, by, 7, 7, [252, 252, 255]);
     buf.setPx(bx + 4, by + 7, [252, 252, 255]);
+    buf.setPx(bx + 4, by + 8, ink);
     const col = EMOTE_COLORS[kind] || [60, 60, 60];
     for (let r = 0; r < spr.length; r++) {
       for (let c = 0; c < spr[r].length; c++) {
-        if (spr[r][c] === 'X') buf.blendPx(bx + 2 + c, by + 1 + r, col, alpha);
+        if (spr[r][c] === 'X') buf.setPx(bx + 2 + c, by + 1 + r, col);
       }
     }
   }
@@ -505,7 +549,7 @@
         const p = this.proj.project(e.u, e.v, e.z + 1);
         const fl = 0.82 + 0.18 * Math.sin(t * 17 + e.u * 3) * Math.sin(t * 7.3 + e.v);
         const s = e.size * fl;
-        buf.ditherGlow(p[0], p[1], 12 * s + 4, 7 * s + 3, [255, 150, 60], 0.45 + (atmo.night || 0) * 0.45, true);
+        buf.smoothGlow(p[0], p[1], 12 * s + 4, 7 * s + 3, [255, 150, 60], 0.45 + (atmo.night || 0) * 0.45, true);
       }
     }
   }
@@ -821,7 +865,7 @@
       buf.rect(Math.round(lb[0]) - 3, Math.round(lb[1]) - 1, 3, 2, on ? [255, 60, 60] : [120, 30, 30]);
       buf.rect(Math.round(lb[0]), Math.round(lb[1]) - 1, 3, 2, on ? [70, 110, 160] : [80, 160, 255]);
       if (o.lightsT != null) {
-        buf.ditherGlow(lb[0] + (on ? -2 : 2), lb[1], 18, 10, on ? [255, 60, 60] : [70, 140, 255], 0.5, true);
+        buf.smoothGlow(lb[0] + (on ? -2 : 2), lb[1], 18, 10, on ? [255, 60, 60] : [70, 140, 255], 0.5, true);
       }
     }
     if (o.wreck) {
@@ -900,8 +944,8 @@
     buf.rect(Math.round(hl1[0]) - 1, Math.round(hl1[1]) - 1, 2, 2, hlc);
     buf.rect(Math.round(hl2[0]) - 1, Math.round(hl2[1]) - 1, 2, 2, hlc);
     if (o.lightsOn) {
-      buf.ditherGlow(hl1[0] + 6, hl1[1] + 3, 14, 7, [255, 240, 190], 0.45, true);
-      buf.ditherGlow(hl2[0] + 6, hl2[1] + 3, 14, 7, [255, 240, 190], 0.45, true);
+      buf.smoothGlow(hl1[0] + 6, hl1[1] + 3, 14, 7, [255, 240, 190], 0.45, true);
+      buf.smoothGlow(hl2[0] + 6, hl2[1] + 3, 14, 7, [255, 240, 190], 0.45, true);
     }
     // star decal on the door
     const st = pr((cab[0] + cab[1]) / 2, v1, 1.75);
@@ -944,6 +988,7 @@
     drawEmote,
     ditherEllipse,
     easeInOut,
+    chunks,
     FireFX,
     NavGrid,
     box,

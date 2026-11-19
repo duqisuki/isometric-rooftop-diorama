@@ -134,7 +134,7 @@
       const p2 = project(u - 0.2 - du, v - dv, z + 3.8);
       buf.line(p1[0], p1[1], p2[0], p2[1], [40, 40, 44], 0.8);
     }
-    buf.ditherGlow(hub[0], hub[1], 22, 7, [180, 176, 170], 0.18, false);
+    buf.smoothGlow(hub[0], hub[1], 22, 7, [180, 176, 170], 0.18, false);
     // tail rotor
     const tr = project(u - 6.6, v + 0.3, z + 3.6);
     buf.line(tr[0] - 2, tr[1] - 2 * Math.cos(t * 30), tr[0] + 2, tr[1] + 2 * Math.cos(t * 30), [40, 40, 44]);
@@ -216,7 +216,7 @@
       }
 
       const hero = crowd.add({
-        role: 'hero', u: 0.8, v: 21.5, state: 'walk', scriptLocked: true, protected: true, noTurn: true, armed: true, rifle: true,
+        role: 'hero', u: 0.8, v: 21.5, state: 'walk', scriptLocked: true, protected: true, noTurn: true, armed: true,
         look: { skin: [214, 180, 152], hair: [40, 34, 30], hairStyle: 'long', shirt: [136, 46, 40], pants: [52, 56, 66], shoes: [36, 36, 40] },
       });
       crowd.setScript(hero, [{ type: 'goto', u: 5, v: 21.5, speed: 1.6 }]);
@@ -227,17 +227,17 @@
 
       S.at(3, () => {
         phase = 'fight';
-        S.control(hero, { armed: true, melee: true, hp: 3, speed: 3.9, gun: { mag: 20, ammo: 20, reserve: 60, rate: 0.13, dmg: 2, heavy: true } });
-        hero.rifle = true;
+        S.control(hero, { armed: true, melee: true, hp: 3, speed: 3.9, gun: { mag: 8, ammo: 8, reserve: 24 } });
+        S.title('LAST DAY', 2.4);
         S.marker = { u: PAD.u, v: PAD.v, z: 9, color: [255, 214, 90] };
         S.trickle = { every: [3.5, 6], max: 22, n: [1, 3], from: 6 };
       });
 
       function camera(t) {
-        if (t < 3) return { x: S.screenOf(hero)[0] + 40, y: S.screenOf(hero)[1] - 6, zoom: 2.0, speed: 1.5 };
+        if (t < 3) return { x: S.screenOf(hero)[0] + 40, y: S.screenOf(hero)[1] - 6, zoom: 1.7, speed: 1.5 };
         if (phase === 'board' || phase === 'liftoff') {
           const p = project(heli.u, heli.v, heli.z);
-          return { x: p[0], y: p[1] - 6, zoom: phase === 'liftoff' ? Math.max(1.2, 2.4 - (heli.z - 2) * 0.03) : 2.4, speed: 1.2 };
+          return { x: p[0], y: p[1] - 6, zoom: phase === 'liftoff' ? Math.max(1.2, 2.4 - (heli.z - 2) * 0.03) : 1.8, speed: 1.2 };
         }
         return null;
       }
@@ -252,7 +252,14 @@
           { type: 'goto', u: heli.u + 0.5, v: heli.v + 1.6, speed: 3.5, r: 0.5 },
           { type: 'call', fn: (a) => { a.hidden = true; a.seated = true; } },
         ]);
-        S.after(1.4, () => { phase = 'liftoff'; heli.landed = false; heli.state = 'liftoff'; sfx.engine(1); });
+        S.after(1.4, () => {
+          phase = 'liftoff';
+          heli.landed = false;
+          heli.state = 'liftoff';
+          sfx.engine(1);
+          // a red balloon drifts up out of the ruins — the one from the park, ninety days ago
+          crowd.floaters.push({ u: heli.u - 6, v: heli.v + 5, z: 1, vz: 3.2, col: [224, 46, 54], phase: 0 });
+        });
         S.after(5.5, () => api.fade(1, 2.2));
         S.after(8.2, () => { sfx.stopEngine(); api.next(); });
       }

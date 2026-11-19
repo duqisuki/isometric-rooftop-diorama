@@ -717,6 +717,7 @@
         hero.v = 19.9; // step off the bench onto the path
         S.control(hero, { armed: false, melee: false, oneTouch: true, speed: 4.05, goal: 'Не дай им коснуться тебя', timer: SURVIVE, timerLabel: 'Продержись' });
         phase = 'survive';
+        S.title('SURVIVE', 2.4);
         S.trickle = { every: [6.5, 9], max: 11, n: [1, 1], from: CONTROL_AT + 16 };
         S.crowd.playerChaseCap = 3.05;
       });
@@ -791,11 +792,11 @@
           const f = p0 ? S.screenOf(p0) : [150, 140];
           const g = S.screenOf(helper);
           const h = S.screenOf(hero);
-          return { x: f[0] * 0.4 + g[0] * 0.3 + h[0] * 0.3, y: f[1] * 0.4 + g[1] * 0.3 + h[1] * 0.3, zoom: t < 16.2 ? 2.5 : 2.8, speed: 1.4 };
+          return { x: f[0] * 0.4 + g[0] * 0.3 + h[0] * 0.3, y: f[1] * 0.4 + g[1] * 0.3 + h[1] * 0.3, zoom: t < 16.2 ? 1.9 : 2.1, speed: 1.4 };
         }
         if ((phase === 'truckIn' || phase === 'boarding') && truck) {
           const p = project(truck.u + 1, truck.v, 0);
-          return { x: p[0], y: p[1] - 8, zoom: 2.2, speed: phase === 'truckIn' ? 4 : 2 };
+          return { x: p[0], y: p[1] - 8, zoom: 1.8, speed: phase === 'truckIn' ? 4 : 2 };
         }
         return null;
       }
