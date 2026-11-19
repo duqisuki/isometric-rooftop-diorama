@@ -161,7 +161,7 @@
     }
 
     zombies() {
-      return this.actors.filter((a) => a.kind === 'zombie' && a.revealed && a.state !== 'down');
+      return this.actors.filter((a) => a.kind === 'zombie' && a.revealed && a.state !== 'down' && a.state !== 'flung');
     }
 
     // ── Main update ─────────────────────────────────────────────────
@@ -257,6 +257,29 @@
       return d;
     }
 
+    // Like moveToward, but walks around walls using the nav grid when needed.
+    // Returns the remaining distance to the final target.
+    goTo(a, tu, tv, speed, dt, accel, extra) {
+      const nav = this.world.nav;
+      if (!nav || nav.lineClear(a.u, a.v, tu, tv)) {
+        a.path = null;
+        return this.moveToward(a, tu, tv, speed, dt, accel, extra);
+      }
+      a.pathT = (a.pathT || 0) - dt;
+      if (!a.path || a.pathT <= 0 || !a.pathGoal || Math.hypot(a.pathGoal.u - tu, a.pathGoal.v - tv) > 1.5) {
+        a.path = nav.findPath(a.u, a.v, tu, tv);
+        a.pathT = 0.5 + Math.random() * 0.4;
+        a.pathGoal = { u: tu, v: tv };
+        a.pathIdx = 0;
+      }
+      if (!a.path || !a.path.length) return this.moveToward(a, tu, tv, speed, dt, accel, extra);
+      while (a.pathIdx < a.path.length - 1 && nav.lineClear(a.u, a.v, a.path[a.pathIdx + 1].u, a.path[a.pathIdx + 1].v)) a.pathIdx++;
+      const wp = a.path[a.pathIdx];
+      this.moveToward(a, wp.u, wp.v, speed, dt, accel, extra);
+      if (Math.hypot(wp.u - a.u, wp.v - a.v) < 0.45 && a.pathIdx < a.path.length - 1) a.pathIdx++;
+      return Math.hypot(tu - a.u, tv - a.v);
+    }
+
     brake(a, dt) {
       const k = Math.min(1, dt * 8);
       a.vu -= a.vu * k;
@@ -281,8 +304,33 @@
             a.v = o.v + (dv / d) * m;
           }
         }
-        a.u = clamp(a.u, 0.8, W.U - 0.8);
-        a.v = clamp(a.v, 0.8, W.V - 0.8);
+        // Axis-aligned walls / furniture
+        const boxes = W.boxes;
+        if (boxes) {
+          const r = a.kind === 'dog' ? 0.22 : 0.3;
+          for (let i = 0; i < boxes.length; i++) {
+            const b = boxes[i];
+            if (a.u > b.u0 - r && a.u < b.u1 + r && a.v > b.v0 - r && a.v < b.v1 + r) {
+              const pl = a.u - (b.u0 - r);
+              const pr = b.u1 + r - a.u;
+              const pt = a.v - (b.v0 - r);
+              const pb = b.v1 + r - a.v;
+              const m = Math.min(pl, pr, pt, pb);
+              if (m === pl) a.u = b.u0 - r;
+              else if (m === pr) a.u = b.u1 + r;
+              else if (m === pt) a.v = b.v0 - r;
+              else a.v = b.v1 + r;
+            }
+          }
+        }
+        const bd = W.bounds;
+        if (bd) {
+          a.u = clamp(a.u, bd.u0, bd.u1);
+          a.v = clamp(a.v, bd.v0, bd.v1);
+        } else {
+          a.u = clamp(a.u, 0.8, W.U - 0.8);
+          a.v = clamp(a.v, 0.8, W.V - 0.8);
+        }
       }
       const sx = a.vu - a.vv;
       if (Math.abs(sx) > 0.12) a.facing = sx > 0 ? 1 : -1;
@@ -325,7 +373,7 @@
     isSolid(a) {
       if (a.removed || a.seated) return false;
       const s = a.state;
-      return !(s === 'down' || s === 'grabbed' || s === 'exit' || s === 'rise' || s === 'bite' || s === 'feed' || s === 'swing');
+      return !(s === 'down' || s === 'flung' || s === 'grabbed' || s === 'exit' || s === 'rise' || s === 'bite' || s === 'feed' || s === 'swing' || s === 'climb');
     }
 
     // ── Scripts (simple per-actor command queue) ────────────────────
@@ -344,12 +392,12 @@
       let done = false;
       if (step.type === 'goto') {
         if (a.state !== 'walk' && a.kind === 'human') a.state = 'walk';
-        const d = this.moveToward(a, step.u, step.v, step.speed || a.walkSpeed, dt, 5);
+        const d = this.goTo(a, step.u, step.v, step.speed || a.walkSpeed, dt, 5);
         if (d < (step.r || 0.35)) done = true;
       } else if (step.type === 'approach') {
         if (a.state !== 'walk' && a.kind === 'human') a.state = 'walk';
         const w = step.who;
-        const d = this.moveToward(a, w.u, w.v, step.speed || a.walkSpeed, dt, 5);
+        const d = this.goTo(a, w.u, w.v, step.speed || a.walkSpeed, dt, 5);
         if (d < (step.r || 1.0)) {
           this.faceToward(a, w);
           a.vu = 0;
@@ -516,7 +564,7 @@
         const rv = a.v - e.v;
         const along = ru * e.du + rv * e.dv;
         const lateral = Math.abs(ru * -e.dv + rv * e.du);
-        if (along > -1.2 && lateral < (e.halfWidth || 2.6) && (moving || along > -0.6)) {
+        if (along > -1.9 && lateral < (e.halfWidth || 2.6)) {
           a.state = 'exit';
           a.exit = e;
           a.st = 0;
@@ -586,6 +634,32 @@
       return false;
     }
 
+    // Throw a zombie through the air; it dies on landing
+    fling(z, vu, vv, vz) {
+      if (!z || z.state === 'down' || z.state === 'flung' || z.removed) return;
+      const v = z.victim;
+      if (v && v.state === 'grabbed') {
+        v.state = 'alert';
+        v.react = 0.15;
+        v.threat = z;
+      }
+      z.victim = null;
+      z.script = null;
+      z.state = 'flung';
+      z.st = 0;
+      z.hp = 0;
+      z.turnAt = -1;
+      z.revealed = true;
+      z.vu = vu;
+      z.vv = vv;
+      z.fvz = vz;
+      z.zOff = 0.5;
+      z.fallDir = (vu - vv) >= 0 ? 1 : -1;
+      if (this.fx.particles) this.fx.particles.bloodBurst(z.u, z.v, 6, 12, 4);
+      this.kills++;
+      this.emit('zombieKilled', z);
+    }
+
     // A loud noise (gunshot) makes nearby zombies come for the source
     noise(src, radius) {
       const zs = this._zombies || this.zombies();
@@ -635,7 +709,7 @@
             const f = a.follow;
             const ou = a.followOff ? a.followOff[0] : 0.9;
             const ov = a.followOff ? a.followOff[1] : 0.9;
-            const d = this.moveToward(a, f.u + ou, f.v + ov, Math.max(f.speedNow, 0.1) + 0.6, dt, 6);
+            const d = this.goTo(a, f.u + ou, f.v + ov, Math.max(f.speedNow, 0.1) + 0.6, dt, 6);
             a.state = d > 0.3 ? 'walk' : 'idle';
             if (d < 0.3) this.brake(a, dt);
             break;
@@ -649,7 +723,7 @@
             }
           } else {
             const sp = a.jog ? a.walkSpeed * 2.1 : a.walkSpeed;
-            const d = this.moveToward(a, a.target.u, a.target.v, sp, dt, 4);
+            const d = this.goTo(a, a.target.u, a.target.v, sp, dt, 4);
             if (d < 0.5) {
               a.state = 'idle';
               a.wait = a.jog ? 0 : 1.2 + Math.random() * 4;
@@ -685,7 +759,7 @@
             this.startFlee(a);
             break;
           }
-          const d = this.moveToward(a, th.u, th.v, a.walkSpeed * 1.1, dt, 4);
+          const d = this.goTo(a, th.u, th.v, a.walkSpeed * 1.1, dt, 4);
           if (d < 4) this.brake(a, dt);
           break;
         }
@@ -796,7 +870,7 @@
         }
       }
 
-      const d = this.moveToward(a, tu, tv, a.runSpeed, dt, 9, [ru, rv]);
+      const d = this.goTo(a, tu, tv, a.runSpeed, dt, 9, [ru, rv]);
       if (!a.parent && d < 1.8) {
         a.state = 'exit';
         a.st = 0;
@@ -858,6 +932,38 @@
           break;
         case 'down':
           break;
+        case 'flung': {
+          // Thrown through the air (hit by a vehicle / explosion)
+          z.zOff = (z.zOff || 0) + z.fvz * dt;
+          z.fvz -= 30 * dt;
+          z.u += z.vu * dt;
+          z.v += z.vv * dt;
+          z.phase += dt * 20;
+          if (z.zOff <= 0 && z.fvz < 0) {
+            z.zOff = 0;
+            z.state = 'down';
+            z.vu = 0;
+            z.vv = 0;
+            if (this.fx.decals) this.fx.decals.add(z.u, z.v, 1.2 + Math.random() * 0.8, { grow: 0.8 });
+            if (this.fx.particles) this.fx.particles.bloodBurst(z.u, z.v, 1, 10, 3.5);
+            if (this.fx.audio) this.fx.audio.thud();
+          }
+          break;
+        }
+        case 'climb': {
+          // Hauling itself up over a ledge / through a window
+          const k = clamp(z.st / (z.climbDur || 1.6), 0, 1);
+          z.zOff = (z.climbFrom || -5) * (1 - k);
+          z.u += (z.climbDU || 0) * dt * 0.6;
+          z.v += (z.climbDV || 0) * dt * 0.6;
+          z.phase += dt * 6;
+          if (k >= 1) {
+            z.zOff = 0;
+            z.state = 'shamble';
+            z.st = 0;
+          }
+          break;
+        }
         case 'stun': {
           const k = Math.max(0, 1 - dt * 5);
           z.vu *= k;
@@ -886,7 +992,7 @@
             z.target = pts[Math.floor(Math.random() * pts.length)];
             z.wait = 4 + Math.random() * 4;
           }
-          this.moveToward(z, z.target.u, z.target.v, z.shambleSpeed, dt, 3);
+          this.goTo(z, z.target.u, z.target.v, z.shambleSpeed, dt, 3);
           break;
         }
         case 'chase': {
@@ -902,11 +1008,19 @@
             z.prey = null;
             break;
           }
-          // Lunge when the prey is almost within reach
+          // Lunge when the prey is almost within reach. The player gets a fair chance:
+          // a walking hero is a bit faster than the dead, sprinting leaves them behind.
           const near = dist(z, t);
-          const sp = near < 2.8 ? z.chaseSpeed * 1.35 : z.chaseSpeed;
-          const d = this.moveToward(z, t.u, t.v, sp, dt, near < 2.8 ? 8 : 5);
-          if (d < 0.95) this.bite(z, t);
+          let sp;
+          let reach = 0.95;
+          if (t.controlled) {
+            sp = Math.min(z.chaseSpeed, this.playerChaseCap || 3.5) * (near < 2.0 ? 1.15 : 1);
+            reach = 0.78;
+          } else {
+            sp = near < 2.8 ? z.chaseSpeed * 1.35 : z.chaseSpeed;
+          }
+          const d = this.goTo(z, t.u, t.v, sp, dt, near < 2.8 ? 8 : 5);
+          if (d < reach) this.bite(z, t);
           break;
         }
         case 'bite': {
@@ -1013,7 +1127,7 @@
         }
         const tu = o.u + (o.facing > 0 ? 1.4 : -0.4);
         const tv = o.v + (o.facing > 0 ? 0.2 : 1.2);
-        const dd = this.moveToward(d, tu, tv, Math.max(o.speedNow + 0.8, 1.2), dt, 5);
+        const dd = this.goTo(d, tu, tv, Math.max(o.speedNow + 0.8, 1.2), dt, 5);
         if (dd < 0.35) this.brake(d, dt);
       } else if (d.state === 'flee') {
         d.barkT = (d.barkT || 0) - dt;
@@ -1021,7 +1135,7 @@
           d.barkT = 0.7 + Math.random() * 0.6;
           if (this.fx.audio) this.fx.audio.bark();
         }
-        const dd = this.moveToward(d, d.exit.u, d.exit.v, 7.5, dt, 9);
+        const dd = this.goTo(d, d.exit.u, d.exit.v, 7.5, dt, 9);
         if (dd < 1.6) {
           d.state = 'exit';
         }
@@ -1132,6 +1246,7 @@
       for (let i = 0; i < acts.length; i++) {
         const a = acts[i];
         const flat = a.state === 'down' || (a.state === 'rise' && a.st < 0.8);
+        if (a.hidden) continue;
         items.push({
           depth: a.u + a.v - (flat ? 0.8 : 0),
           draw: () => {
@@ -1200,8 +1315,8 @@
   }
 
   function drawPerson(buf, a, atmo, proj, time) {
-    let z = 0;
-    if (a.seated) z = a.seatZ != null ? a.seatZ : 1.4;
+    let z = a.zOff || 0;
+    if (a.seated) z += a.seatZ != null ? a.seatZ : 1.4;
     let ou = 0;
     let ov = 0;
     if (a.state === 'swing') {
@@ -1251,8 +1366,10 @@
     const ink = atmo.ink;
     const blood = L([150, 22, 32]);
 
-    // ── Lying body ──
-    if (a.state === 'down' || (a.state === 'rise' && a.st < 0.8)) {
+    if (a.hidden) return;
+
+    // ── Lying body (also tumbling through the air when flung) ──
+    if (a.state === 'down' || a.state === 'flung' || (a.state === 'rise' && a.st < 0.8)) {
       const dir = a.fallDir || 1;
       const tw = a.state === 'rise' ? (Math.random() < 0.5 ? 1 : 0) : 0;
       x += tw;
@@ -1418,8 +1535,13 @@
         const gunHi = atmo.applyLight([128, 136, 152]);
         const hx2 = Math.round(sx0 + ax * (3.6 - kick * 1.2));
         const hy2 = Math.round(sy0 + ay * (2.6 - kick * 0.8));
-        const tipX = Math.round(hx2 + ax * 3.6);
-        const tipY = Math.round(hy2 + ay * 2.6);
+        const glen = a.rifle ? 6.5 : 3.6;
+        const tipX = Math.round(hx2 + ax * glen);
+        const tipY = Math.round(hy2 + ay * glen * 0.72);
+        if (a.rifle) {
+          // stock tucked behind the hand
+          ln(hx2, hy2, Math.round(hx2 - ax * 2.5), Math.round(hy2 - ay * 1.8 + 1), gun);
+        }
         ln(sx0, sy0, hx2, hy2, shirt);
         ln(hx2, hy2, tipX, tipY, gun);
         px(hx2, hy2 + 1, gun);
@@ -1428,7 +1550,7 @@
         a.muzzleX = tipX + ax;
         a.muzzleY = tipY + ay;
       }
-    } else if (isZ && a.kind === 'zombie' && (a.state === 'shamble' || a.state === 'chase' || a.state === 'idle' || a.state === 'stun')) {
+    } else if (isZ && a.kind === 'zombie' && (a.state === 'shamble' || a.state === 'chase' || a.state === 'idle' || a.state === 'stun' || a.state === 'climb')) {
       const bobA = Math.round(Math.sin(a.phase * 1.4));
       ln(shF, shY + 1, shF + f * 4, shY + 1 + bobA, shirt);
       px(shF + f * 5, shY + 1 + bobA, skin);
@@ -1624,6 +1746,11 @@
       buf.line(x - 2, y - 3, x, y - 5, L([132, 94, 56]));
       buf.line(x, y - 5, x + 2, y - 3, L([132, 94, 56]));
       buf.setPx(x + 1, y - 3, L([214, 60, 60]));
+    } else if (p.type === 'rifle') {
+      buf.line(x - 4, y, x + 4, y - 2, L([46, 50, 44]));
+      buf.line(x - 4, y + 1, x - 2, y + 1, L([96, 76, 52]));
+      buf.setPx(x + 1, y, L([70, 76, 66]));
+      buf.setPx(x, y + 1, L([70, 76, 66]));
     } else if (p.type === 'bucket') {
       buf.rect(x - 1, y - 2, 2, 2, L([220, 70, 60]));
       buf.setPx(x + 1, y, L([90, 150, 210]));

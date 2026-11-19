@@ -703,6 +703,80 @@ body.mode-sandbox .story-only {
   color: #c9cfdb;
 }
 
+.hud-tag {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(150, 18, 28, 0.82);
+  color: #fff1f1;
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.hud-stamina {
+  width: 92px;
+  height: 5px;
+  border-radius: 99px;
+  background: rgba(16, 18, 24, 0.5);
+  overflow: hidden;
+}
+
+.hud-stamina-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 99px;
+  background: #8fd9a0;
+  transition: width 0.1s linear;
+}
+
+.hud-stamina.low .hud-stamina-fill {
+  background: #f0a35e;
+}
+
+.hud-timer {
+  padding: 4px 10px;
+  border-radius: 7px;
+  background: rgba(16, 18, 24, 0.7);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.hud-timer.urgent {
+  color: #ffd27a;
+}
+
+.hud-goal[hidden],
+.hud-ammo[hidden],
+.hud-kills[hidden],
+.hud-timer[hidden] {
+  display: none;
+}
+
+.story-caption {
+  position: absolute;
+  left: 50%;
+  bottom: 54px;
+  max-width: min(80%, 560px);
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: rgba(10, 12, 18, 0.74);
+  color: #f3f5f9;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+  transform: translateX(-50%) translateY(6px);
+  opacity: 0;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+  pointer-events: none;
+}
+
+.story-caption.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
 .hud-hint {
   position: absolute;
   left: 50%;
