@@ -193,6 +193,14 @@
         document.documentElement.style.setProperty('--bg', atmo.bgHex);
         document.body.dataset.theme = atmo.isDarkTheme ? 'dark' : 'light';
       },
+      // After the last chapter: back to the title screen
+      onFinish() {
+        started = false;
+        story.started = false;
+        story.start(0, false);
+        const ss = document.getElementById('start-screen');
+        if (ss) ss.classList.remove('hidden');
+      },
     });
     story.start(0, false);
 
@@ -260,6 +268,7 @@
       KeyA: 'a', ArrowLeft: 'a',
       KeyS: 's', ArrowDown: 's',
       KeyD: 'd', ArrowRight: 'd',
+      ShiftLeft: 'shift', ShiftRight: 'shift',
     };
     const input = story.input;
 
@@ -655,7 +664,8 @@
       if (state.mode === 'story') {
         story.step(dt);
         renderStory();
-        const aiming = story.playable && !story.paused;
+        const pl = story.inst && story.inst.debug && story.inst.debug.player;
+        const aiming = story.playable && !story.paused && !!(pl && pl.armed);
         if (aiming !== canvas.classList.contains('aiming')) canvas.classList.toggle('aiming', aiming);
       } else {
         step(dt);

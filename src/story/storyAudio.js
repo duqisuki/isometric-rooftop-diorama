@@ -20,7 +20,56 @@
     }
 
     get ok() {
-      return this.sc && this.sc.enabled && this.sc.ctx;
+      return !this.muted && this.sc && this.sc.enabled && this.sc.ctx;
+    }
+
+    horn() {
+      if (!this.ensure()) return;
+      [0, 0.32].forEach((off) => {
+        this.tone(311, 'square', 0.05, 0.28, off);
+        this.tone(392, 'square', 0.04, 0.28, off);
+      });
+    }
+
+    engine(level) {
+      if (!this.ensure()) return;
+      const ctx = this.sc.ctx;
+      if (!this.engineOsc) {
+        this.engineOsc = ctx.createOscillator();
+        this.engineOsc.type = 'sawtooth';
+        this.engineOsc.frequency.value = 48;
+        const lp = ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 220;
+        this.engineGain = ctx.createGain();
+        this.engineGain.gain.value = 0;
+        this.engineOsc.connect(lp);
+        lp.connect(this.engineGain);
+        this.engineGain.connect(this.bus);
+        this.engineOsc.start();
+      }
+      const now = ctx.currentTime;
+      this.engineGain.gain.setTargetAtTime(level * 0.09, now, 0.15);
+      this.engineOsc.frequency.setTargetAtTime(42 + level * 40, now, 0.2);
+    }
+
+    crash() {
+      this.noise(0.9, 'lowpass', 900, 0.4);
+      this.tone(60, 'sine', 0.3, 0.8);
+      this.noise(0.4, 'highpass', 2600, 0.12);
+    }
+
+    shot(heavy) {
+      this.noise(heavy ? 0.28 : 0.18, 'lowpass', heavy ? 1800 : 2600, heavy ? 0.4 : 0.3);
+      this.tone(heavy ? 90 : 140, 'sine', 0.2, 0.12);
+    }
+
+    whoosh() {
+      this.noise(0.5, 'bandpass', 600, 0.12, 0.7);
+    }
+
+    stopEngine() {
+      if (this.engineGain && this.sc.ctx) this.engineGain.gain.setTargetAtTime(0, this.sc.ctx.currentTime, 0.2);
     }
 
     ensure() {

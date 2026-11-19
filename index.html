@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Rooftop Anthology</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=3" />
 </head>
 <body data-theme="light" class="mode-story">
   <main class="stage" id="stage">
@@ -55,20 +55,16 @@
           <div class="hud-left">
             <div class="hud-hearts" id="hud-hearts"></div>
             <div class="hud-goal" id="hud-goal"></div>
+            <div class="hud-stamina" title="Рывок (Shift)"><div class="hud-stamina-fill" id="hud-stamina-fill"></div></div>
           </div>
           <div class="hud-right">
+            <div class="hud-timer" id="hud-timer" hidden></div>
             <div class="hud-ammo" id="hud-ammo"></div>
             <div class="hud-kills" id="hud-kills"></div>
           </div>
         </div>
-        <div class="hud-hint" id="hud-hint">
-          <span><b>WASD</b> бег</span>
-          <span><b>Мышь</b> прицел</span>
-          <span><b>ЛКМ</b> выстрел</span>
-          <span><b>ПКМ / Пробел</b> удар</span>
-          <span><b>R</b> перезарядка</span>
-          <span><b>Esc</b> пауза</span>
-        </div>
+        <div class="story-caption" id="story-caption"></div>
+        <div class="hud-hint" id="hud-hint"></div>
         <div class="story-fade" id="story-fade"></div>
         <div class="story-card" id="story-card" aria-live="polite">
           <div class="card-kicker"></div>
@@ -178,7 +174,7 @@
       <div class="start-inner">
         <div class="start-kicker">Пиксельная хроника апокалипсиса</div>
         <h1 class="start-title">Rooftop Anthology</h1>
-        <p class="start-text">Как люди выживали — с первого дня, когда всё было нормально.<br />Когда начнётся паника, герой — твой: <b>WASD</b>, мышь, <b>ЛКМ</b> — выстрел, <b>ПКМ / Пробел</b> — удар.</p>
+        <p class="start-text">Шесть глав: от первого дня, когда всё было нормально, до последнего, когда всё в огне.<br />Когда начнётся паника, герой — твой: <b>WASD</b> — бег, <b>Shift</b> — рывок.</p>
         <button type="button" class="start-btn" id="btn-start">Начать</button>
         <div class="start-links">
           <button type="button" class="start-link" id="btn-start-muted">Без звука</button>
@@ -189,21 +185,27 @@
     </div>
   </main>
 
-  <script src="src/palette.js"></script>
-  <script src="src/pixelBuffer.js"></script>
-  <script src="src/iso.js"></script>
-  <script src="src/scenarios.js"></script>
-  <script src="src/architecture.js"></script>
-  <script src="src/entities.js"></script>
-  <script src="src/weather.js"></script>
-  <script src="src/audio.js"></script>
-  <script src="src/ui.js"></script>
+  <script src="src/palette.js?v=3"></script>
+  <script src="src/pixelBuffer.js?v=3"></script>
+  <script src="src/iso.js?v=3"></script>
+  <script src="src/scenarios.js?v=3"></script>
+  <script src="src/architecture.js?v=3"></script>
+  <script src="src/entities.js?v=3"></script>
+  <script src="src/weather.js?v=3"></script>
+  <script src="src/audio.js?v=3"></script>
+  <script src="src/ui.js?v=3"></script>
   <!-- Story mode -->
-  <script src="src/story/kit.js"></script>
-  <script src="src/story/actors.js"></script>
-  <script src="src/story/storyAudio.js"></script>
-  <script src="src/story/story.js"></script>
-  <script src="src/story/chapters/ch1_park.js"></script>
-  <script src="src/main.js"></script>
+  <script src="src/story/kit.js?v=3"></script>
+  <script src="src/story/actors.js?v=3"></script>
+  <script src="src/story/storyAudio.js?v=3"></script>
+  <script src="src/story/story.js?v=3"></script>
+  <script src="src/story/stage.js?v=3"></script>
+  <script src="src/story/chapters/ch1_park.js?v=3"></script>
+  <script src="src/story/chapters/ch2_street.js?v=3"></script>
+  <script src="src/story/chapters/ch3_school.js?v=3"></script>
+  <script src="src/story/chapters/ch4_roof.js?v=3"></script>
+  <script src="src/story/chapters/ch5_house.js?v=3"></script>
+  <script src="src/story/chapters/ch6_lastday.js?v=3"></script>
+  <script src="src/main.js?v=3"></script>
 </body>
 </html>

@@ -22,6 +22,7 @@
       this.soundscape = opts.audio;
       this.sfx = new Diorama.StoryAudio(opts.audio);
       this.onTheme = opts.onTheme || null;
+      this.onFinish = opts.onFinish || null;
       this.onRequestSandbox = opts.onRequestSandbox || null;
       this.index = 0;
       this.inst = null;
@@ -52,6 +53,9 @@
         hudAmmo: document.getElementById('hud-ammo'),
         hudGoal: document.getElementById('hud-goal'),
         hudKills: document.getElementById('hud-kills'),
+        hudTimer: document.getElementById('hud-timer'),
+        hudStamina: document.getElementById('hud-stamina-fill'),
+        caption: document.getElementById('story-caption'),
         hint: document.getElementById('hud-hint'),
         chapterLabel: document.getElementById('story-chapter'),
         chapterSegs: document.getElementById('story-chapters'),
@@ -92,15 +96,17 @@
     }
 
     // ── Chapter lifecycle ───────────────────────────────────────────
-    start(index, autoplay) {
+    start(index, autoplay, opts) {
+      opts = opts || {};
       this.index = clamp(index, 0, CHAPTERS.length - 1);
       this.t = 0;
       this.finished = false;
+      this.finalEnd = false;
       this.timers = [];
       this.shakeAmt = 0;
       this.hideEnd();
       this.hideCard(true);
-      this.fade(0, 0);
+      this.hideCaption();
       this.playable = false;
       this.input.fire = 0;
       this.input.melee = 0;
@@ -109,16 +115,68 @@
       this.showHint(false);
       this.showPause(false);
       this.inst = this.chapter.create(this.api());
-      const c = this.inst.camera(0);
+      if (opts.retry && this.chapter.retryAt) this.fastForward(this.chapter.retryAt);
+      const c = this.inst.camera(this.t);
       this.cam.x = c.x;
       this.cam.y = c.y;
       this.cam.zoom = c.zoom;
+      if (opts.fadeIn) {
+        this.fade(1, 0);
+        requestAnimationFrame(() => requestAnimationFrame(() => this.fade(0, 1.4)));
+      } else {
+        this.fade(0, 0);
+      }
       if (autoplay !== undefined) this.paused = !autoplay;
       this.syncUI();
     }
 
+    // Silently simulate up to time T (used to skip a chapter's intro on retry)
+    fastForward(T) {
+      this.sfx.muted = true;
+      const dt = 1 / 30;
+      while (this.t < T) {
+        this.t += dt;
+        for (let i = this.timers.length - 1; i >= 0; i--) {
+          if (this.t >= this.timers[i].at) {
+            const fn = this.timers[i].fn;
+            this.timers.splice(i, 1);
+            fn();
+          }
+        }
+        this.inst.update(this.t, dt);
+      }
+      this.sfx.muted = false;
+      this.hideCaption();
+    }
+
+    // Retry: same chapter, intro skipped. After the final chapter: start over.
     restart() {
-      this.start(this.index, true);
+      if (this.finalEnd) this.start(0, true, { fadeIn: true });
+      else this.start(this.index, true, { retry: true, fadeIn: true });
+    }
+
+    next() {
+      if (this.index + 1 < CHAPTERS.length) {
+        this.start(this.index + 1, true, { fadeIn: true });
+      } else if (this.onFinish) {
+        this.onFinish();
+      } else {
+        this.start(0, false);
+      }
+    }
+
+    showCaption(text, dur) {
+      const el = this.el.caption;
+      if (!el) return;
+      el.textContent = text;
+      el.classList.add('visible');
+      this.captionId = (this.captionId || 0) + 1;
+      const id = this.captionId;
+      if (dur) this.after(dur, () => { if (this.captionId === id) this.hideCaption(); });
+    }
+
+    hideCaption() {
+      if (this.el.caption) this.el.caption.classList.remove('visible');
     }
 
     skip() {
@@ -145,11 +203,17 @@
       el.classList.toggle('visible', !!on);
     }
 
-    showHint(on) {
-      if (this.el.hint) this.el.hint.classList.toggle('visible', !!on);
+    showHint(on, html) {
+      if (!this.el.hint) return;
+      if (html && this.el.hint.dataset.k !== html) {
+        this.el.hint.innerHTML = html;
+        this.el.hint.dataset.k = html;
+      }
+      this.el.hint.classList.toggle('visible', !!on);
     }
 
-    // HUD: null hides it; otherwise { hp, maxHp, ammo, reserve, reloading, kills, goal }
+    // HUD: null hides it; otherwise
+    // { hp, maxHp, oneTouch, armed, ammo, reserve, reloading, stamina, kills, goal, timer, timerLabel }
     hud(h) {
       const el = this.el;
       if (!el.hud) return;
@@ -159,17 +223,35 @@
       }
       el.hud.hidden = false;
       let hearts = '';
-      for (let i = 0; i < h.maxHp; i++) hearts += `<span class="heart${i < h.hp ? '' : ' empty'}"></span>`;
+      if (!h.oneTouch) for (let i = 0; i < h.maxHp; i++) hearts += `<span class="heart${i < h.hp ? '' : ' empty'}"></span>`;
       if (el.hudHearts.dataset.k !== hearts) {
         el.hudHearts.innerHTML = hearts;
         el.hudHearts.dataset.k = hearts;
       }
-      const ammo = h.reloading ? 'перезарядка…' : `${h.ammo} / ${h.reserve}`;
-      if (el.hudAmmo.textContent !== ammo) el.hudAmmo.textContent = ammo;
-      el.hudAmmo.classList.toggle('low', !h.reloading && h.ammo <= 3);
+      el.hudAmmo.hidden = !h.armed;
+      if (h.armed) {
+        const ammo = h.reloading ? 'перезарядка…' : `${h.ammo} / ${h.reserve}`;
+        if (el.hudAmmo.textContent !== ammo) el.hudAmmo.textContent = ammo;
+        el.hudAmmo.classList.toggle('low', !h.reloading && h.ammo <= 3);
+      }
+      el.hudKills.hidden = !h.armed;
       const kills = `Убито: ${h.kills}`;
       if (el.hudKills.textContent !== kills) el.hudKills.textContent = kills;
-      if (h.goal != null && el.hudGoal.textContent !== h.goal) el.hudGoal.textContent = h.goal;
+      // No objective text on screen — the world (markers, the timer) tells you what to do
+      el.hudGoal.hidden = true;
+      if (el.hudTimer) {
+        el.hudTimer.hidden = h.timer == null;
+        if (h.timer != null) {
+          const s = Math.ceil(h.timer);
+          const txt = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+          if (el.hudTimer.textContent !== txt) el.hudTimer.textContent = txt;
+          el.hudTimer.classList.toggle('urgent', h.timer < 10);
+        }
+      }
+      if (el.hudStamina) {
+        el.hudStamina.style.width = Math.round((h.stamina != null ? h.stamina : 1) * 100) + '%';
+        el.hudStamina.parentElement.classList.toggle('low', h.stamina < 0.3);
+      }
     }
 
     // Mouse position in virtual-buffer pixels (camera applied, without shake)
@@ -212,8 +294,11 @@
           if (!on) this.input.keys = {};
         },
         hud: (h) => this.hud(h),
-        hint: (on) => this.showHint(on),
+        hint: (on, html) => this.showHint(on, html),
         end: (o) => this.endWith(o),
+        next: () => this.next(),
+        retry: () => this.restart(),
+        caption: (text, dur) => this.showCaption(text, dur),
       };
     }
 
