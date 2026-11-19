@@ -1,0 +1,477 @@
+:root {
+  --bg: #ffffff;
+  --fg: #2b2f38;
+  --fg-soft: #5c6270;
+  --fg-muted: #9ea4b0;
+  --hairline: rgba(28, 34, 46, 0.11);
+  --surface: rgba(255, 255, 255, 0.94);
+  --surface-hover: rgba(28, 34, 46, 0.055);
+  --track: #ebebef;
+  --track-fill: rgba(43, 47, 56, 0.14);
+  --tick: rgba(43, 47, 56, 0.18);
+  --thumb-bg: #ffffff;
+  --thumb-border: rgba(28, 34, 46, 0.22);
+  --thumb-shadow: 0 1px 3px rgba(15, 20, 30, 0.14), 0 0.5px 1px rgba(15, 20, 30, 0.08);
+  --seg-bg: #e4e6ec;
+  --seg-fill: #545966;
+  --pill-bg: rgba(28, 34, 46, 0.045);
+  --pill-active-bg: rgba(28, 34, 46, 0.08);
+  --menu-shadow: 0 10px 30px rgba(15, 22, 36, 0.12), 0 1px 3px rgba(15, 22, 36, 0.06);
+  --toast-bg: rgba(28, 34, 46, 0.84);
+  --toast-fg: #f7f9fc;
+}
+
+body[data-theme="dark"] {
+  --fg: #edf1f8;
+  --fg-soft: #adb6c8;
+  --fg-muted: #6e788e;
+  --hairline: rgba(226, 234, 250, 0.14);
+  --surface: rgba(22, 28, 44, 0.94);
+  --surface-hover: rgba(226, 234, 250, 0.09);
+  --track: rgba(226, 234, 250, 0.13);
+  --track-fill: rgba(235, 210, 155, 0.26);
+  --tick: rgba(226, 234, 250, 0.24);
+  --thumb-bg: #eef2fa;
+  --thumb-border: rgba(255, 255, 255, 0.4);
+  --thumb-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  --seg-bg: rgba(226, 234, 250, 0.18);
+  --seg-fill: #d8dfee;
+  --pill-bg: rgba(226, 234, 250, 0.07);
+  --pill-active-bg: rgba(226, 234, 250, 0.15);
+  --menu-shadow: 0 14px 36px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --toast-bg: rgba(235, 241, 252, 0.9);
+  --toast-fg: #141926;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  transition: background-color 0.35s ease, color 0.35s ease;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 12px;
+}
+
+/* ── Top Bar ──────────────────────────────────────────────────────── */
+
+.top-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 20;
+}
+
+.scene-picker {
+  position: relative;
+}
+
+.scene-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.25s ease;
+}
+
+.scene-trigger:hover {
+  background: var(--surface-hover);
+}
+
+.scene-trigger .chevron {
+  color: var(--fg-muted);
+  transition: transform 0.18s ease, color 0.15s ease;
+}
+
+.scene-trigger[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+  color: var(--fg);
+}
+
+.scene-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 224px;
+  padding: 5px;
+  border-radius: 11px;
+  border: 1px solid var(--hairline);
+  background: var(--surface);
+  box-shadow: var(--menu-shadow);
+  backdrop-filter: blur(12px);
+  z-index: 50;
+}
+
+.scene-menu[hidden] {
+  display: none;
+}
+
+.scene-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg);
+  font-size: 12.5px;
+  font-weight: 450;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.scene-option:hover {
+  background: var(--surface-hover);
+}
+
+.scene-option.active {
+  background: var(--pill-active-bg);
+  font-weight: 600;
+}
+
+.scene-option-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scene-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  border-radius: 4px;
+  border: 1px solid var(--hairline);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+
+.scene-option.active .scene-key {
+  color: var(--fg);
+  border-color: var(--fg-muted);
+}
+
+.scene-option-time {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-muted);
+}
+
+/* 5-Scenario Progress Segments */
+.scene-segments {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.scene-segment {
+  position: relative;
+  width: 24px;
+  height: 12px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.scene-segment-track {
+  position: relative;
+  width: 100%;
+  height: 2.5px;
+  border-radius: 99px;
+  background: var(--seg-bg);
+  overflow: hidden;
+  transition: height 0.14s ease, background-color 0.25s ease;
+}
+
+.scene-segment:hover .scene-segment-track {
+  height: 3.5px;
+}
+
+.scene-segment-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0%;
+  border-radius: 99px;
+  background: var(--seg-fill);
+  transition: background-color 0.25s ease;
+}
+
+/* ── Center Canvas Viewport ───────────────────────────────────────── */
+
+.diorama-viewport {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+#diorama-canvas {
+  display: block;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: -webkit-crisp-edges;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  cursor: default;
+  touch-action: none;
+}
+
+#diorama-canvas.interactive-hover {
+  cursor: pointer;
+}
+
+.interact-toast {
+  position: absolute;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%) translateY(4px);
+  padding: 4px 10px;
+  border-radius: 99px;
+  background: var(--toast-bg);
+  color: var(--toast-fg);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+  white-space: nowrap;
+}
+
+.interact-toast.visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ── Bottom Transport Bar ─────────────────────────────────────────── */
+
+.bottom-bar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 20;
+}
+
+.transport-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--fg-soft);
+  cursor: pointer;
+  transition: background-color 0.14s ease, color 0.14s ease;
+}
+
+.icon-btn:hover {
+  background: var(--surface-hover);
+  color: var(--fg);
+}
+
+#btn-play .icon-play {
+  display: none;
+}
+
+#btn-play.paused .icon-pause {
+  display: none;
+}
+
+#btn-play.paused .icon-play {
+  display: block;
+}
+
+#btn-audio .icon-unmuted {
+  display: none;
+}
+
+#btn-audio[aria-pressed="true"] .icon-muted {
+  display: none;
+}
+
+#btn-audio[aria-pressed="true"] .icon-unmuted {
+  display: block;
+}
+
+#btn-audio[aria-pressed="true"] {
+  color: var(--fg);
+}
+
+/* Scrubber */
+.scrubber {
+  position: relative;
+  width: min(220px, 44vw);
+  height: 24px;
+  display: flex;
+  align-items: center;
+  cursor: ew-resize;
+  touch-action: none;
+  outline: none;
+}
+
+.scrubber-track {
+  position: relative;
+  width: 100%;
+  height: 11px;
+  border-radius: 6px;
+  background: var(--track);
+  transition: background-color 0.25s ease;
+}
+
+.scrubber-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 70%;
+  border-radius: 6px;
+  background: var(--track-fill);
+  pointer-events: none;
+}
+
+.scrubber-ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.scrubber-tick {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  width: 1px;
+  background: var(--tick);
+  transform: translateX(-0.5px);
+}
+
+.scrubber-thumb {
+  position: absolute;
+  top: 50%;
+  left: 70%;
+  width: 20px;
+  height: 15px;
+  border-radius: 5px;
+  border: 1px solid var(--thumb-border);
+  background: var(--thumb-bg);
+  box-shadow: var(--thumb-shadow);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  transition: transform 0.1s ease, background-color 0.25s ease;
+}
+
+.scrubber:hover .scrubber-thumb,
+.scrubber.dragging .scrubber-thumb {
+  transform: translate(-50%, -50%) scale(1.06);
+}
+
+.scrubber:focus-visible .scrubber-thumb {
+  outline: 2px solid var(--fg-soft);
+  outline-offset: 1px;
+}
+
+.time-readout {
+  min-width: 35px;
+  font-size: 11.5px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-soft);
+  text-align: center;
+  letter-spacing: 0.01em;
+}
+
+.mode-pill {
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--pill-bg);
+  color: var(--fg-soft);
+  font-size: 10.5px;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.mode-pill:hover {
+  background: var(--pill-active-bg);
+  color: var(--fg);
+}
+
+.mode-pill[aria-pressed="true"] {
+  background: var(--pill-active-bg);
+  color: var(--fg);
+}
+
+.hint-line {
+  margin: 0;
+  font-size: 10.5px;
+  color: var(--fg-muted);
+  letter-spacing: 0.01em;
+  text-align: center;
+  transition: color 0.3s ease;
+}
+
+@media (max-width: 520px) {
+  .stage {
+    padding: 14px 10px 14px;
+  }
+  .transport-row {
+    gap: 8px;
+  }
+  .hint-line {
+    font-size: 9.5px;
+  }
+}
