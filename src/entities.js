@@ -210,10 +210,10 @@
         { u: 17.5, v: 18.2, z: 0, vz: 0, flying: false, flyT: 0, seed: 4.3, facing: 1, peck: 0 },
       ],
       swallows: [
-        { phase: 0.0, speed: 0.45, radX: 102, radY: 24, baseY: 84 },
-        { phase: 1.7, speed: 0.52, radX: 118, radY: 20, baseY: 96 },
-        { phase: 3.4, speed: 0.41, radX: 94, radY: 26, baseY: 72 },
-        { phase: 5.0, speed: 0.48, radX: 108, radY: 18, baseY: 90 },
+        { phase: 0.0, speed: 0.45, radX: 98, radY: 18, baseY: 54 },
+        { phase: 1.7, speed: 0.52, radX: 112, radY: 16, baseY: 64 },
+        { phase: 3.4, speed: 0.41, radX: 92, radY: 20, baseY: 44 },
+        { phase: 5.0, speed: 0.48, radX: 104, radY: 14, baseY: 60 },
       ],
       fireflies: Array.from({ length: 16 }, (_, i) => ({
         u: 8 + ((i * 11.3) % 30),
@@ -1222,7 +1222,7 @@
       for (let i = 0; i < entities.swallows.length; i++) {
         const sw = entities.swallows[i];
         const a = t * sw.speed + sw.phase;
-        const x = Math.round(225 + Math.cos(a) * sw.radX);
+        const x = Math.round(175 + Math.cos(a) * sw.radX);
         const y = Math.round(sw.baseY + Math.sin(a * 2) * sw.radY * 0.5);
         const flap = Math.sin(t * 11 + sw.phase) > 0 ? -1 : 1;
         buf.hline(x - 1, x + 1, y, col);

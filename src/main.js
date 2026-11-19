@@ -44,6 +44,7 @@
 
     const initialScenario = LIST[DEFAULT_INDEX];
     const state = {
+      mode: 'story', // 'story' | 'sandbox'
       scenarioIndex: DEFAULT_INDEX,
       scenario: initialScenario,
       env: cloneEnv(initialScenario.env),
@@ -71,18 +72,61 @@
 
     Ent.applyScenarioRoles(entities, initialScenario.id);
 
-    // ── Responsive Crisp Integer Pixel Scaling ──────────────────────
+    // ── Responsive Full-Size Pixel Scaling + Optional Mouse Wheel Zoom ──
+    let userZoom = 1.0;
+
     function resizeCanvas() {
-      const vw = Math.max(240, viewport.clientWidth - 16);
-      const vh = Math.max(180, viewport.clientHeight - 12);
-      const rawScale = Math.min(vw / CANVAS_W, vh / CANVAS_H);
-      // Exact integer scaling (>= 2) guarantees razor-sharp uniform square pixels
-      const scale = rawScale >= 2 ? Math.min(4, Math.floor(rawScale)) : Math.max(0.85, rawScale);
+      const vw = Math.max(260, viewport.clientWidth - 8);
+      const vh = Math.max(200, viewport.clientHeight - 4);
+      const fitScale = Math.min(vw / CANVAS_W, vh / CANVAS_H);
+      const scale = Math.min(6, Math.max(1, fitScale * userZoom));
       const cssW = Math.round(CANVAS_W * scale);
       const cssH = Math.round(CANVAS_H * scale);
       canvas.style.width = cssW + 'px';
       canvas.style.height = cssH + 'px';
+      // Backing store at real device resolution, so the browser never re-scales it
+      const dpr = global.devicePixelRatio || 1;
+      const bw = Math.round(cssW * dpr);
+      const bh = Math.round(cssH * dpr);
+      if (canvas.width !== bw || canvas.height !== bh) {
+        canvas.width = bw;
+        canvas.height = bh;
+      }
     }
+
+    // ── Crisp presentation ──────────────────────────────────────────
+    // Nearest-neighbour scaling by a non-integer factor makes some pixels wider
+    // than others ("wobbly" pixels). Instead: blow the frame up by an exact integer
+    // factor first, then fit it to the screen with a light bilinear pass, so every
+    // virtual pixel ends up as the same size square with only a soft 1px edge.
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = CANVAS_W;
+    offCanvas.height = CANVAS_H;
+    const offCtx = offCanvas.getContext('2d');
+    const upCanvas = document.createElement('canvas');
+    const upCtx = upCanvas.getContext('2d');
+
+    function presentView(sx, sy, sw, sh) {
+      offCtx.putImageData(buf.imageData, 0, 0);
+      const need = canvas.width / sw;
+      const k = Math.max(1, Math.min(8, Math.ceil(need - 0.001)));
+      if (upCanvas.width !== CANVAS_W * k) {
+        upCanvas.width = CANVAS_W * k;
+        upCanvas.height = CANVAS_H * k;
+      }
+      upCtx.imageSmoothingEnabled = false;
+      upCtx.drawImage(offCanvas, 0, 0, CANVAS_W * k, CANVAS_H * k);
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'low';
+      ctx.drawImage(upCanvas, sx * k, sy * k, sw * k, sh * k, 0, 0, canvas.width, canvas.height);
+    }
+
+    viewport.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+      userZoom = clamp(userZoom * factor, 0.75, 2.4);
+      resizeCanvas();
+    }, { passive: false });
 
     global.addEventListener('resize', resizeCanvas);
     resizeCanvas();
@@ -91,6 +135,7 @@
     // ── Controller API shared with UI ───────────────────────────────
     const controller = {
       selectScenario(idx, userTriggered) {
+        if (state.mode !== 'sandbox' && userTriggered) return;
         const nextIdx = ((idx % LIST.length) + LIST.length) % LIST.length;
         state.scenarioIndex = nextIdx;
         state.scenario = LIST[nextIdx];
@@ -104,6 +149,13 @@
         }
       },
       togglePlay() {
+        if (state.mode === 'story') {
+          if (!started) return;
+          // During gameplay Space is the melee key; pause is Esc
+          if (story.playable && !story.paused) return;
+          story.togglePause();
+          return;
+        }
         state.paused = !state.paused;
       },
       toggleTourMode() {
@@ -112,17 +164,19 @@
         ui.showToast(state.tourMode ? 'Auto-tour: 5×10s' : 'Single scenario loop');
       },
       toggleAudio() {
-        state.audioEnabled = !state.audioEnabled;
-        audio.setEnabled(state.audioEnabled);
-        ui.showToast(state.audioEnabled ? 'Ambient audio on' : 'Audio muted');
+        setAudio(!state.audioEnabled);
+        ui.showToast(state.audioEnabled ? (state.mode === 'story' ? 'Звук включён' : 'Ambient audio on') : (state.mode === 'story' ? 'Звук выключен' : 'Audio muted'));
       },
       setTimeOfDay(hours) {
+        if (state.mode !== 'sandbox') return;
         state.hours = ((hours % 24) + 24) % 24;
       },
       nudgeTime(deltaHours) {
+        if (state.mode !== 'sandbox') return;
         state.hours = ((state.hours + deltaHours) % 24 + 24) % 24;
       },
       spawnWave() {
+        if (state.mode !== 'sandbox') return;
         Ent.spawnZombieWave(entities, 3);
         ui.showToast('Zombie wave incoming!');
         audio.playInteract('door');
@@ -130,6 +184,131 @@
     };
 
     const ui = createUI(controller);
+
+    // ── Story mode ──────────────────────────────────────────────────
+    let started = false;
+    const story = new Diorama.Story({
+      audio,
+      onTheme(atmo) {
+        document.documentElement.style.setProperty('--bg', atmo.bgHex);
+        document.body.dataset.theme = atmo.isDarkTheme ? 'dark' : 'light';
+      },
+    });
+    story.start(0, false);
+
+    const audioBtns = Array.from(document.querySelectorAll('.btn-audio'));
+    function setAudio(on) {
+      state.audioEnabled = !!on;
+      audio.setEnabled(state.audioEnabled);
+      audioBtns.forEach((b) => b.setAttribute('aria-pressed', state.audioEnabled ? 'true' : 'false'));
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      document.body.classList.toggle('mode-story', mode === 'story');
+      document.body.classList.toggle('mode-sandbox', mode === 'sandbox');
+      if (mode === 'sandbox') {
+        story.paused = true;
+        story.fade(0, 0);
+        story.hideCard(true);
+        story.hideEnd();
+        controller.selectScenario(state.scenarioIndex, false);
+        state.env = cloneEnv(state.scenario.env);
+      }
+      if (mode === 'story') {
+        if (!story.finished && started) story.paused = false;
+      }
+      hideStartScreen();
+    }
+
+    const startScreen = document.getElementById('start-screen');
+    function hideStartScreen() {
+      if (startScreen) startScreen.classList.add('hidden');
+    }
+
+    function beginStory(withSound) {
+      started = true;
+      story.started = true;
+      hideStartScreen();
+      if (withSound) setAudio(true);
+      setMode('story');
+      story.start(0, true);
+    }
+
+    const byId = (id) => document.getElementById(id);
+    byId('btn-start').addEventListener('click', () => beginStory(true));
+    byId('btn-start-muted').addEventListener('click', () => beginStory(false));
+    byId('btn-start-sandbox').addEventListener('click', () => setMode('sandbox'));
+    byId('btn-to-story').addEventListener('click', () => {
+      setMode('story');
+      if (!started) beginStory(state.audioEnabled);
+    });
+    byId('btn-end-replay').addEventListener('click', () => story.restart());
+    byId('btn-end-sandbox').addEventListener('click', () => setMode('sandbox'));
+
+    byId('btn-pause-resume').addEventListener('click', () => story.togglePause());
+    byId('btn-pause-restart').addEventListener('click', () => story.restart());
+    byId('btn-pause-sandbox').addEventListener('click', () => {
+      story.showPause(false);
+      setMode('sandbox');
+    });
+
+    // ── Player input (story gameplay) ─────────────────────────────
+    // e.code is layout-independent, so WASD also works on a Russian keyboard
+    const MOVE_KEYS = {
+      KeyW: 'w', ArrowUp: 'w',
+      KeyA: 'a', ArrowLeft: 'a',
+      KeyS: 's', ArrowDown: 's',
+      KeyD: 'd', ArrowRight: 'd',
+    };
+    const input = story.input;
+
+    document.addEventListener('keydown', (e) => {
+      if (state.mode !== 'story' || !started) return;
+      if (e.code === 'Escape' || e.code === 'KeyP') {
+        story.togglePause();
+        e.preventDefault();
+        return;
+      }
+      if (!story.playable || story.paused) return;
+      const mk = MOVE_KEYS[e.code];
+      if (mk) {
+        input.keys[mk] = true;
+        e.preventDefault();
+      } else if (e.code === 'Space' || e.code === 'KeyF' || e.code === 'KeyE') {
+        if (!e.repeat) input.melee++;
+        e.preventDefault();
+      } else if (e.code === 'KeyR') {
+        input.reload++;
+      }
+    });
+    document.addEventListener('keyup', (e) => {
+      const mk = MOVE_KEYS[e.code];
+      if (mk) input.keys[mk] = false;
+    });
+    global.addEventListener('blur', () => {
+      input.keys = {};
+      story.input.keys = input.keys;
+    });
+
+    function trackPointer(e) {
+      const r = canvas.getBoundingClientRect();
+      input.fx = clamp((e.clientX - r.left) / Math.max(1, r.width), 0, 1);
+      input.fy = clamp((e.clientY - r.top) / Math.max(1, r.height), 0, 1);
+    }
+    global.addEventListener('pointermove', (e) => {
+      if (state.mode === 'story') trackPointer(e);
+    });
+    canvas.addEventListener('pointerdown', (e) => {
+      if (state.mode !== 'story' || !story.playable || story.paused) return;
+      trackPointer(e);
+      if (e.button === 0) input.fire++;
+      else if (e.button === 2) input.melee++;
+      e.preventDefault();
+    });
+    canvas.addEventListener('contextmenu', (e) => {
+      if (state.mode === 'story') e.preventDefault();
+    });
 
     // ── Pointer Mapping & Hit Testing ───────────────────────────────
     function clientToVirtual(clientX, clientY) {
@@ -152,6 +331,7 @@
     }
 
     canvas.addEventListener('pointermove', (e) => {
+      if (state.mode !== 'sandbox') return;
       const [vx, vy] = clientToVirtual(e.clientX, e.clientY);
       const hit = pickHit(vx, vy);
       canvas.classList.toggle('interactive-hover', !!hit);
@@ -162,6 +342,7 @@
     });
 
     canvas.addEventListener('pointerdown', (e) => {
+      if (state.mode !== 'sandbox') return;
       const [vx, vy] = clientToVirtual(e.clientX, e.clientY);
       const hit = pickHit(vx, vy);
       if (!hit) return;
@@ -455,9 +636,15 @@
       Weath.drawDitheredClouds(buf, weather, state, atmo, state.hitList);
       Weath.drawForegroundWeather(buf, weather, state, atmo, state.hitList);
 
-      // Blit razor-sharp virtual pixel buffer to canvas
-      buf.present(ctx);
+      // Blit the virtual pixel buffer to the canvas with even, crisp pixels
+      presentView(0, 0, CANVAS_W, CANVAS_H);
       ui.sync(state, atmo);
+    }
+
+    function renderStory() {
+      story.render(buf);
+      const r = story.viewRect();
+      presentView(r.sx, r.sy, r.sw, r.sh);
     }
 
     // Main loop
@@ -465,14 +652,31 @@
     function frame(ts) {
       const dt = Math.min(0.05, Math.max(0.001, (ts - lastTs) / 1000));
       lastTs = ts;
-      step(dt);
-      render();
+      if (state.mode === 'story') {
+        story.step(dt);
+        renderStory();
+        const aiming = story.playable && !story.paused;
+        if (aiming !== canvas.classList.contains('aiming')) canvas.classList.toggle('aiming', aiming);
+      } else {
+        step(dt);
+        render();
+      }
       requestAnimationFrame(frame);
     }
 
     // Expose clean API for testing / inspection
     global.__DIORAMA__ = {
       state,
+      story,
+      setMode,
+      beginStory,
+      renderNow() {
+        if (state.mode === 'story') {
+          renderStory();
+        } else {
+          render();
+        }
+      },
       controller,
       triggerLightning: () => Weath.triggerLightning(weather, audio),
       snapToScenario(idx) {
@@ -486,6 +690,8 @@
 
     step(0.016);
     render();
+    story.step(0.016);
+    renderStory();
     requestAnimationFrame(frame);
   }
 

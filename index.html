@@ -1,16 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Rooftop Anthology — 5-Scenario Isometric Pixel Diorama</title>
+  <title>Rooftop Anthology</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body data-theme="light">
+<body data-theme="light" class="mode-story">
   <main class="stage" id="stage">
-    <!-- Top Scene Selector & 5-Scenario Progress Bars -->
+    <!-- Top bar -->
     <header class="top-bar">
-      <div class="scene-picker" id="scene-picker">
+      <!-- Story mode: chapter title + chapter segments -->
+      <div class="story-head story-only">
+        <span class="story-chapter" id="story-chapter">Глава 1 · Обычный день</span>
+        <div class="scene-segments" id="story-chapters" aria-label="Главы"></div>
+      </div>
+
+      <!-- Sandbox mode: rooftop scenario picker -->
+      <div class="scene-picker sandbox-only" id="scene-picker">
         <button
           class="scene-trigger"
           id="scene-trigger"
@@ -30,25 +37,71 @@
         </div>
       </div>
 
-      <div class="scene-segments" id="scene-segments" role="tablist" aria-label="Scenarios">
+      <div class="scene-segments sandbox-only" id="scene-segments" role="tablist" aria-label="Scenarios">
         <!-- 5 progress segments populated by ui.js -->
       </div>
     </header>
 
     <!-- Main Isometric Pixel Canvas -->
     <section class="diorama-viewport" id="diorama-viewport">
-      <canvas
-        id="diorama-canvas"
-        width="350"
-        height="264"
-        aria-label="Interactive isometric pixel-art rooftop diorama"
-      ></canvas>
+      <div class="canvas-frame" id="canvas-frame">
+        <canvas
+          id="diorama-canvas"
+          width="480"
+          height="270"
+          aria-label="Isometric pixel-art diorama"
+        ></canvas>
+        <div class="hud" id="hud" hidden>
+          <div class="hud-left">
+            <div class="hud-hearts" id="hud-hearts"></div>
+            <div class="hud-goal" id="hud-goal"></div>
+          </div>
+          <div class="hud-right">
+            <div class="hud-ammo" id="hud-ammo"></div>
+            <div class="hud-kills" id="hud-kills"></div>
+          </div>
+        </div>
+        <div class="hud-hint" id="hud-hint">
+          <span><b>WASD</b> бег</span>
+          <span><b>Мышь</b> прицел</span>
+          <span><b>ЛКМ</b> выстрел</span>
+          <span><b>ПКМ / Пробел</b> удар</span>
+          <span><b>R</b> перезарядка</span>
+          <span><b>Esc</b> пауза</span>
+        </div>
+        <div class="story-fade" id="story-fade"></div>
+        <div class="story-card" id="story-card" aria-live="polite">
+          <div class="card-kicker"></div>
+          <div class="card-title"></div>
+          <div class="card-sub"></div>
+        </div>
+        <div class="story-card story-end" id="story-end" hidden>
+          <div class="card-kicker"></div>
+          <div class="card-title"></div>
+          <div class="card-sub"></div>
+          <div class="card-actions">
+            <button type="button" class="card-btn primary" id="btn-end-replay">Смотреть снова</button>
+            <button type="button" class="card-btn" id="btn-end-sandbox">Крыша · песочница</button>
+          </div>
+        </div>
+        <div class="story-card story-pause" id="story-pause" hidden>
+          <div class="card-kicker">Пауза</div>
+          <div class="card-title">Передышка</div>
+          <div class="card-sub">WASD — бег · мышь — прицел · ЛКМ — выстрел · ПКМ / Пробел — удар · R — перезарядка</div>
+          <div class="card-actions">
+            <button type="button" class="card-btn primary" id="btn-pause-resume">Продолжить</button>
+            <button type="button" class="card-btn" id="btn-pause-restart">Начать заново</button>
+            <button type="button" class="card-btn" id="btn-pause-sandbox">Крыша · песочница</button>
+          </div>
+        </div>
+      </div>
       <div class="interact-toast" id="interact-toast" aria-live="polite"></div>
     </section>
 
-    <!-- Bottom Transport & Time Scrubber -->
+    <!-- Bottom bar -->
     <footer class="bottom-bar">
-      <div class="transport-row">
+      <!-- Sandbox transport (rooftop) -->
+      <div class="transport-row sandbox-only">
         <button
           class="icon-btn"
           id="btn-play"
@@ -94,7 +147,7 @@
         >5×10s</button>
 
         <button
-          class="icon-btn"
+          class="icon-btn btn-audio"
           id="btn-audio"
           type="button"
           aria-pressed="false"
@@ -111,12 +164,29 @@
             <path d="M12.5 3.9C13.7 5 14.3 6.4 14.3 8C14.3 9.6 13.7 11 12.5 12.1" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
           </svg>
         </button>
+
+        <button class="mode-pill" id="btn-to-story" type="button" title="Вернуться к сюжету">Сюжет</button>
       </div>
 
-      <p class="hint-line">
+      <p class="hint-line sandbox-only">
         Click zombies to shoot &middot; Click diorama to interact &middot; Drag slider &middot; Keys 1&ndash;5 &middot; Z wave
       </p>
     </footer>
+
+    <!-- Start screen -->
+    <div class="start-screen" id="start-screen">
+      <div class="start-inner">
+        <div class="start-kicker">Пиксельная хроника апокалипсиса</div>
+        <h1 class="start-title">Rooftop Anthology</h1>
+        <p class="start-text">Как люди выживали — с первого дня, когда всё было нормально.<br />Когда начнётся паника, герой — твой: <b>WASD</b>, мышь, <b>ЛКМ</b> — выстрел, <b>ПКМ / Пробел</b> — удар.</p>
+        <button type="button" class="start-btn" id="btn-start">Начать</button>
+        <div class="start-links">
+          <button type="button" class="start-link" id="btn-start-muted">Без звука</button>
+          <span aria-hidden="true">·</span>
+          <button type="button" class="start-link" id="btn-start-sandbox">Крыша · песочница</button>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script src="src/palette.js"></script>
@@ -128,6 +198,12 @@
   <script src="src/weather.js"></script>
   <script src="src/audio.js"></script>
   <script src="src/ui.js"></script>
+  <!-- Story mode -->
+  <script src="src/story/kit.js"></script>
+  <script src="src/story/actors.js"></script>
+  <script src="src/story/storyAudio.js"></script>
+  <script src="src/story/story.js"></script>
+  <script src="src/story/chapters/ch1_park.js"></script>
   <script src="src/main.js"></script>
 </body>
 </html>
