@@ -1,3 +1,17 @@
+<!-- English summary -->
+> **Rooftop Anthology** — a pixel-art zombie-apocalypse story told in six isometric dioramas.
+> Pure JavaScript + Canvas 2D: no build step, no dependencies, no engine. Custom pixel renderer,
+> isometric projection, A* pathfinding, crowd AI (people, zombies, dogs, pigeons), weather and
+> procedural audio.
+>
+> **[▶ Play in the browser](https://duqisuki.github.io/isometric-rooftop-diorama/)** ·
+> Controls: `WASD` move, `Shift` dash, mouse aim, `LMB` shoot, `RMB`/`Space` melee, `R` reload, `Esc` pause.
+> Run locally: open `index.html` or serve the folder with any static server. License: [MIT](LICENSE).
+
+![Rooftop Anthology](docs/screenshot.png)
+
+---
+
 # Rooftop Anthology
 
 Пиксельная хроника зомби-апокалипсиса в изометрических диорамах.
